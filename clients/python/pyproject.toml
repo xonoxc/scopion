@@ -8,15 +8,15 @@ version = "1.0.0"
 description = "Client library for Scopion"
 readme = "README.md"
 authors = [{name = "Your Name", email = "your.email@example.com"}]
-license = {text = "MIT"}
+license = "MIT"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 requires-python = ">=3.6"
 dependencies = [
     "requests",
+    "twine>=3.8.0",
 ]
 
 [project.urls]
@@ -24,8 +24,5 @@ Homepage = "https://github.com/xonoxc/scopion"
 Repository = "https://github.com/xonoxc/scopion"
 
 [tool.setuptools]
-packages = ["scopion_client"]
-
-[tool.setuptools.package-dir]
-"" = "."
+py-modules = ["scopion_client"]
 
