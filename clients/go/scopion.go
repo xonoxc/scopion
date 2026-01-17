@@ -1,4 +1,4 @@
-package scopion
+package client
 
 import (
 	"bufio"

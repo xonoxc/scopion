@@ -70,8 +70,8 @@ dev:
 # =========================
 test:
 	$(GO_CMD) test ./...
-	python -m unittest clients/test_scopion_client.py
-	cd clients && bun run test
+	cd clients/python && python -m unittest test_scopion_client.py
+	cd clients/typescript && bun run test
 
 test-race:
 	$(GO_CMD) test -race ./...
