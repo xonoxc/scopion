@@ -1,0 +1,241 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* SCOPION Dark Theme - Developer-focused observability */
+:root {
+   /* Dark mode first - OpenSea Pro Aesthetic */
+   /* Matte Charcoal & Deep Grey Palette */
+   --background: #0b0b0b;
+   /* Deepest matte black, not pure black */
+   --foreground: #ffffff;
+   /* Pure white for headers */
+
+   --card: #121212;
+   /* Slightly lighter matte background */
+   --card-foreground: #e5e5e5;
+   /* Off-white for data */
+
+   --popover: #1a1a1a;
+   --popover-foreground: #ffffff;
+
+   --primary: #2081e2;
+   /* OpenSea Blue */
+   --primary-foreground: #ffffff;
+
+   --secondary: #262626;
+   /* Subtly lighter for headers/sections */
+   --secondary-foreground: #a3a3a3;
+   /* Muted text */
+
+   --muted: #1a1a1a;
+   --muted-foreground: #8a8a8a;
+   /* Classic "Pro" label color */
+
+   --accent: #262626;
+   /* Hover state background */
+   --accent-foreground: #ffffff;
+
+   --destructive: #f76dc0;
+   /* Pink/Red for crits, more crypto-native */
+   --destructive-foreground: #ffffff;
+
+   --warning: #f2c94c;
+   --warning-foreground: #000000;
+
+   --success: #34d69b;
+   /* Emerald/Mint */
+   --success-foreground: #000000;
+
+   --border: #262626;
+   /* Subtle, crisp border */
+   --input: #1a1a1a;
+   --ring: #2081e2;
+
+   --radius: 0.75rem;
+   /* 12px - Balanced */
+
+   --sidebar: #0b0b0b;
+   /* Blend with background */
+   --sidebar-foreground: #8a8a8a;
+   --sidebar-primary: #ffffff;
+   --sidebar-primary-foreground: #000000;
+   --sidebar-accent: #1a1a1a;
+   --sidebar-accent-foreground: #ffffff;
+   --sidebar-border: #262626;
+   --sidebar-ring: #2081e2;
+
+   /* Chart colors - Neon/Matte contrast */
+   --chart-1: #2081e2;
+   /* Blue */
+   --chart-2: #34d69b;
+   /* Mint */
+   --chart-3: #f76dc0;
+   /* Pink */
+   --chart-4: #f2c94c;
+   /* Yellow */
+   --chart-5: #a855f7;
+   /* Purple */
+}
+
+.dark {
+   --background: #0b0b0b;
+   --foreground: #ffffff;
+   --card: #121212;
+   --card-foreground: #e5e5e5;
+   --popover: #1a1a1a;
+   --popover-foreground: #ffffff;
+   --primary: #2081e2;
+   --primary-foreground: #ffffff;
+   --secondary: #262626;
+   --secondary-foreground: #a3a3a3;
+   --muted: #1a1a1a;
+   --muted-foreground: #8a8a8a;
+   --accent: #262626;
+   --accent-foreground: #ffffff;
+   --destructive: #f76dc0;
+   --destructive-foreground: #ffffff;
+   --border: #262626;
+   --input: #1a1a1a;
+   --ring: #2081e2;
+   --sidebar: #0b0b0b;
+   --sidebar-foreground: #8a8a8a;
+   --sidebar-primary: #ffffff;
+   --sidebar-primary-foreground: #000000;
+   --sidebar-accent: #1a1a1a;
+   --sidebar-accent-foreground: #ffffff;
+   --sidebar-border: #262626;
+   --sidebar-ring: #2081e2;
+}
+
+@theme inline {
+   --font-sans: "Inter", "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+   --font-mono: "JetBrains Mono", "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+   --color-background: var(--background);
+   --color-foreground: var(--foreground);
+   --color-card: var(--card);
+   --color-card-foreground: var(--card-foreground);
+   --color-popover: var(--popover);
+   --color-popover-foreground: var(--popover-foreground);
+   --color-primary: var(--primary);
+   --color-primary-foreground: var(--primary-foreground);
+   --color-secondary: var(--secondary);
+   --color-secondary-foreground: var(--secondary-foreground);
+   --color-muted: var(--muted);
+   --color-muted-foreground: var(--muted-foreground);
+   --color-accent: var(--accent);
+   --color-accent-foreground: var(--accent-foreground);
+   --color-destructive: var(--destructive);
+   --color-destructive-foreground: var(--destructive-foreground);
+   --color-warning: var(--warning);
+   --color-warning-foreground: var(--warning-foreground);
+   --color-success: var(--success);
+   --color-success-foreground: var(--success-foreground);
+   --color-border: var(--border);
+   --color-input: var(--input);
+   --color-ring: var(--ring);
+   --radius-sm: calc(var(--radius) - 4px);
+   --radius-md: var(--radius);
+   --radius-lg: calc(var(--radius) + 4px);
+   --radius-xl: calc(var(--radius) + 12px);
+   --color-sidebar: var(--sidebar);
+   --color-sidebar-foreground: var(--sidebar-foreground);
+   --color-sidebar-primary: var(--sidebar-primary);
+   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+   --color-sidebar-accent: var(--sidebar-accent);
+   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+   --color-sidebar-border: var(--sidebar-border);
+   --color-sidebar-ring: var(--sidebar-ring);
+   --color-chart-1: var(--chart-1);
+   --color-chart-2: var(--chart-2);
+   --color-chart-3: var(--chart-3);
+   --color-chart-4: var(--chart-4);
+   --color-chart-5: var(--chart-5);
+}
+
+@layer base {
+   * {
+      @apply border-border outline-ring/50;
+   }
+
+   body {
+      @apply bg-background text-foreground tracking-tight antialiased text-sm font-medium;
+   }
+
+   /* Base typography specifically for "Pro" density */
+   h1,
+   h2,
+   h3,
+   h4,
+   h5,
+   h6 {
+      @apply tracking-wide font-semibold;
+   }
+}
+
+/* Custom scrollbar for dark theme - minimal */
+::-webkit-scrollbar {
+   width: 6px;
+   height: 6px;
+}
+
+::-webkit-scrollbar-track {
+   background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+   background: oklch(0.28 0.005 260);
+   border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+   background: oklch(0.35 0.005 260);
+}
+
+/* Smooth animations */
+@keyframes slideIn {
+   from {
+      opacity: 0;
+      transform: translateY(-4px);
+   }
+
+   to {
+      opacity: 1;
+      transform: translateY(0);
+   }
+}
+
+.animate-slide-in {
+   animation: slideIn 0.15s ease-out;
+}
+
+@keyframes subtlePulse {
+
+   0%,
+   100% {
+      opacity: 1;
+   }
+
+   50% {
+      opacity: 0.5;
+   }
+}
+
+.animate-subtle-pulse {
+   animation: subtlePulse 2s ease-in-out infinite;
+}
+
+@keyframes fadeIn {
+   from {
+      opacity: 0;
+   }
+
+   to {
+      opacity: 1;
+   }
+}
+
+.animate-fade-in {
+   animation: fadeIn 0.2s ease-out;
+}

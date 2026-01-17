@@ -1,0 +1,28 @@
+---
+import Mascot from './mascot.astro';
+---
+<nav class="fixed top-0 w-full z-50 px-6 py-6">
+    <div class="max-w-7xl mx-auto bg-card/80 backdrop-blur-md border border-white/5 rounded-full px-6 py-3 flex items-center justify-between">
+        
+        <!-- Logo -->
+        <a href="/" class="flex items-center gap-2 group">
+            <div class="w-8 h-8 relative">
+               <Mascot class="w-full h-full" />
+            </div>
+            <span class="font-bold text-lg tracking-tight">Scopion</span>
+        </a>
+
+        <!-- Links (Hidden on mobile) -->
+        <div class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-400">
+            <a href="#features" class="hover:text-white transition-colors">Features</a>
+            <a href="#install" class="hover:text-white transition-colors">Installation</a>
+            <a href="#tech" class="hover:text-white transition-colors">Tech Stack</a>
+            <a href="https://github.com/xonoxc/scopion" target="_blank" class="hover:text-white transition-colors">GitHub</a>
+        </div>
+
+        <!-- CTA -->
+        <a href="#install" class="bg-white text-black text-sm font-semibold px-6 py-2 rounded-full hover:bg-gray-200 transition-colors">
+            Get Started
+        </a>
+    </div>
+</nav>
