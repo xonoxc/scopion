@@ -19,7 +19,7 @@ func TestIngestEvent(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.URL)
-	err := client.IngestEvent("info", "test", "event", nil)
+	err := client.IngestEvent("info", "test", "event", nil, nil)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -37,7 +37,29 @@ func TestIngestEventWithTrace(t *testing.T) {
 
 	client := NewClient(server.URL)
 	traceID := "trace123"
-	err := client.IngestEvent("error", "api", "timeout", &traceID)
+	err := client.IngestEvent("error", "api", "timeout", &traceID, nil)
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+}
+
+func TestIngestEventWithCustomData(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/ingest" && r.Method == "POST" {
+			w.WriteHeader(202)
+		} else {
+			w.WriteHeader(404)
+		}
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL)
+	customData := map[string]interface{}{
+		"user_id":    123,
+		"action":     "login",
+		"ip_address": "192.168.1.1",
+	}
+	err := client.IngestEvent("info", "auth", "user_login", nil, customData)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}

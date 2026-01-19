@@ -1,0 +1,25 @@
+
+
+# Ignore build and output directories
+node_modules/
+out/
+.build/
+.cache/
+dist/
+
+
+# Ignore configuration files
+**/*.config.js
+
+# Ignore generated files (e.g., GraphQL codegen output)
+**/__generated__/
+
+# Ignore coverage reports
+coverage/
+
+# Ignore .gitignored files
+**/.gitignored
+
+# Ignore Docker files (if using Docker)
+Dockerfile
+docker-compose.yml

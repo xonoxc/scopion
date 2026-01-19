@@ -110,6 +110,7 @@ func startServerWithConfig(ctx context.Context, port string, config ServerConfig
 
 	http.Handle("/api/live", loggingMiddleware(live.SSE(broadcaster)))
 	http.Handle("/api/events", loggingMiddleware(api.EventsHandler(store)))
+	http.Handle("/api/trace-events", loggingMiddleware(api.TraceEventsHandler(store)))
 	http.Handle("/api/stats", loggingMiddleware(api.StatsHandler(store)))
 	http.Handle("/api/errors-by-service", loggingMiddleware(api.ErrorsByServiceHandler(store)))
 	http.Handle("/api/services", loggingMiddleware(api.ServicesHandler(store)))

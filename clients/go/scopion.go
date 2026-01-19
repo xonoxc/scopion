@@ -18,15 +18,16 @@ func NewClient(baseURL string) *Client {
 }
 
 type Event struct {
-	ID        string  `json:"id"`
-	Timestamp string  `json:"timestamp"`
-	Level     string  `json:"level"`
-	Service   string  `json:"service"`
-	Name      string  `json:"name"`
-	TraceID   *string `json:"trace_id,omitempty"`
+	ID        string                 `json:"id"`
+	Timestamp string                 `json:"timestamp"`
+	Level     string                 `json:"level"`
+	Service   string                 `json:"service"`
+	Name      string                 `json:"name"`
+	TraceID   *string                `json:"trace_id,omitempty"`
+	Data      map[string]interface{} `json:"data,omitempty"`
 }
 
-func (c *Client) IngestEvent(level, service, name string, traceID *string) error {
+func (c *Client) IngestEvent(level, service, name string, traceID *string, customData map[string]interface{}) error {
 	data := map[string]any{
 		"level":   level,
 		"service": service,
@@ -34,6 +35,9 @@ func (c *Client) IngestEvent(level, service, name string, traceID *string) error
 	}
 	if traceID != nil {
 		data["trace_id"] = *traceID
+	}
+	if customData != nil {
+		data["data"] = customData
 	}
 	jsonData, err := json.Marshal(data)
 	if err != nil {

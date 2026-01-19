@@ -13,14 +13,14 @@ export default defineConfig({
       }),
       react(),
    ],
-    server: {
-       proxy: {
-          '/api': {
-             target: 'http://localhost:8080',
-             changeOrigin: true,
-          },
-       },
-    },
+   server: {
+      proxy: {
+         "/api": {
+            target: "http://localhost:8080",
+            changeOrigin: true,
+         },
+      },
+   },
    resolve: {
       alias: {
          "~": "/src",

@@ -24,69 +24,59 @@ interface Span {
    metadata?: Record<string, string>
 }
 
+interface TraceEvent {
+   id: string
+   timestamp: string
+   level: string
+   service: string
+   name: string
+   trace_id?: string
+   data?: Record<string, any>
+}
+
 interface TraceTimelineProps {
    trace: SelectedTrace
+   events: TraceEvent[]
    onClose: () => void
 }
 
-const mockSpans: Span[] = [
-   {
-      id: "span1",
-      name: "GET /users",
-      duration: 120,
-      startOffset: 0,
-      hasError: false,
-      metadata: { "http.method": "GET", "http.url": "/users", "http.status": "200" },
-      children: [
-         {
-            id: "span2",
-            name: "auth middleware",
-            duration: 15,
-            startOffset: 2,
-            hasError: false,
-            metadata: { "auth.type": "jwt", "auth.user": "user_123" },
-            children: [],
-         },
-         {
-            id: "span3",
-            name: "db query",
-            duration: 80,
-            startOffset: 20,
-            hasError: true,
-            errorMessage: "Connection timeout after 80ms",
-            metadata: { "db.type": "postgres", "db.statement": "SELECT * FROM users LIMIT 100" },
-            children: [
-               {
-                  id: "span4",
-                  name: "connection pool",
-                  duration: 75,
-                  startOffset: 22,
-                  hasError: true,
-                  errorMessage: "Pool exhausted",
-                  metadata: { "pool.size": "10", "pool.active": "10" },
-                  children: [],
-               },
-            ],
-         },
-         {
-            id: "span5",
-            name: "response handler",
-            duration: 5,
-            startOffset: 110,
-            hasError: false,
-            metadata: { "response.size": "1.2kb" },
-            children: [],
-         },
-      ],
-   },
-]
+// Convert events to spans
+function eventsToSpans(events: TraceEvent[]): Span[] {
+   if (events.length === 0) return []
 
-export function TraceTimeline({ trace, onClose }: TraceTimelineProps) {
+   const startTime = new Date(events[0].timestamp).getTime()
+   const endTime = new Date(events[events.length - 1].timestamp).getTime()
+
+   return events.map((event, index) => {
+      const eventTime = new Date(event.timestamp).getTime()
+      const startOffset = eventTime - startTime
+
+      // For simplicity, assume each event is a span with duration based on time to next event
+      const nextEventTime =
+         index < events.length - 1 ? new Date(events[index + 1].timestamp).getTime() : endTime
+      const duration = Math.max(nextEventTime - eventTime, 1) // Minimum 1ms
+
+      return {
+         id: event.id,
+         name: event.name,
+         duration: duration,
+         startOffset: startOffset,
+         hasError: event.level === "error",
+         errorMessage: event.level === "error" ? event.name : undefined,
+         metadata: event.data || {},
+         children: [],
+      }
+   })
+}
+
+export function TraceTimeline({ trace, events, onClose }: TraceTimelineProps) {
    const [copiedId, setCopiedId] = useState(false)
-   const [expandedSpans, setExpandedSpans] = useState<Set<string>>(new Set(["span1", "span3"]))
+   const [expandedSpans, setExpandedSpans] = useState<Set<string>>(new Set())
 
-   const totalDuration = 120
-   const totalSpans = 5
+   const spans = eventsToSpans(events)
+   const totalDuration =
+      spans.length > 0 ? Math.max(...spans.map(s => s.startOffset + s.duration)) : 0
+   const totalSpans = spans.length
 
    const copyTraceId = () => {
       navigator.clipboard.writeText(trace.id)
@@ -138,7 +128,7 @@ export function TraceTimeline({ trace, onClose }: TraceTimelineProps) {
                </button>
 
                {/* Span name */}
-               <div className="flex min-w-[180px] items-center gap-2">
+               <div className="flex min-w-45 items-center gap-2">
                   <span
                      className={cn(
                         "text-sm font-medium",
@@ -288,7 +278,7 @@ export function TraceTimeline({ trace, onClose }: TraceTimelineProps) {
          {/* Timeline header with scale */}
          <div className="flex items-center gap-3 border-b border-border bg-muted/30 px-6 py-2.5">
             <span className="w-6" />
-            <span className="min-w-[180px] text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <span className="min-w-45 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                Span
             </span>
             <div className="flex-1 flex justify-between text-[10px] text-muted-foreground font-mono">
@@ -304,7 +294,7 @@ export function TraceTimeline({ trace, onClose }: TraceTimelineProps) {
          </div>
 
          {/* Spans */}
-         <div className="flex-1 overflow-auto">{mockSpans.map(span => renderSpan(span))}</div>
+         <div className="flex-1 overflow-auto">{spans.map(span => renderSpan(span))}</div>
       </div>
    )
 }

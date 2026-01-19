@@ -3,11 +3,7 @@ import { AreaChart, Area, ResponsiveContainer } from "recharts"
 import { cn } from "~/lib/utils"
 import { useServices } from "~/hooks/use-services"
 
-interface ServicesViewProps {}
-
-
-
-export function ServicesView({}: ServicesViewProps) {
+export function ServicesView() {
     const { data: services, isLoading } = useServices()
 
     if (isLoading) {

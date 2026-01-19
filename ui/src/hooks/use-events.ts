@@ -14,4 +14,3 @@ export function useEvents(limit: number = 100) {
       refetchInterval: 5000,
    })
 }
-

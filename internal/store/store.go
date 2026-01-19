@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -31,9 +32,18 @@ func NewWithDB(db *sql.DB) *Store {
 }
 
 func (s *Store) Append(e model.Event) error {
-	_, err := s.db.Exec(
-		"INSERT INTO events (id, timestamp, level, service, name, trace_id) VALUES (?, ?, ?, ?, ?, ?)",
-		e.ID, e.Timestamp, e.Level, e.Service, e.Name, e.TraceID,
+	var dataJSON []byte
+	var err error
+	if e.Data != nil {
+		dataJSON, err = json.Marshal(e.Data)
+		if err != nil {
+			return fmt.Errorf("failed to marshal event data: %w", err)
+		}
+	}
+
+	_, err = s.db.Exec(
+		"INSERT INTO events (id, timestamp, level, service, name, trace_id, data) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		e.ID, e.Timestamp, e.Level, e.Service, e.Name, e.TraceID, string(dataJSON),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert event: %w", err)
@@ -43,7 +53,7 @@ func (s *Store) Append(e model.Event) error {
 
 func (s *Store) Recent(n int) ([]model.Event, error) {
 	rows, err := s.db.Query(
-		"SELECT id, timestamp, level, service, name, trace_id FROM events ORDER BY timestamp DESC LIMIT ?",
+		"SELECT id, timestamp, level, service, name, trace_id, data FROM events ORDER BY timestamp DESC LIMIT ?",
 		n,
 	)
 	if err != nil {
@@ -54,10 +64,19 @@ func (s *Store) Recent(n int) ([]model.Event, error) {
 	var events []model.Event
 	for rows.Next() {
 		var e model.Event
-		err := rows.Scan(&e.ID, &e.Timestamp, &e.Level, &e.Service, &e.Name, &e.TraceID)
+		var dataStr sql.NullString
+		err := rows.Scan(&e.ID, &e.Timestamp, &e.Level, &e.Service, &e.Name, &e.TraceID, &dataStr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan event: %w", err)
 		}
+
+		if dataStr.Valid && dataStr.String != "" {
+			err = json.Unmarshal([]byte(dataStr.String), &e.Data)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal event data: %w", err)
+			}
+		}
+
 		events = append(events, e)
 	}
 
@@ -217,13 +236,23 @@ func (s *Store) GetTraces(limit int) ([]TraceInfo, error) {
 	var results []TraceInfo
 	for rows.Next() {
 		var t TraceInfo
-		var startTime, endTime time.Time
+		var startTimeStr, endTimeStr string
 		var hasErrorInt int
 		var names string
 
-		err := rows.Scan(&t.ID, &names, &t.Service, &t.Spans, &startTime, &endTime, &hasErrorInt)
+		err := rows.Scan(&t.ID, &names, &t.Service, &t.Spans, &startTimeStr, &endTimeStr, &hasErrorInt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan trace info: %w", err)
+		}
+
+		startTime, err := time.Parse("2006-01-02 15:04:05.999999999-07:00", startTimeStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse start time: %w", err)
+		}
+
+		endTime, err := time.Parse("2006-01-02 15:04:05.999999999-07:00", endTimeStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse end time: %w", err)
 		}
 
 		t.Name = names // For simplicity, use concatenated names
@@ -240,7 +269,7 @@ func (s *Store) GetTraces(limit int) ([]TraceInfo, error) {
 func (s *Store) SearchEvents(query string, limit int) ([]model.Event, error) {
 	// Search in name, service, and trace_id fields
 	searchQuery := `
-		SELECT id, timestamp, level, service, name, trace_id
+		SELECT id, timestamp, level, service, name, trace_id, data
 		FROM events
 		WHERE name LIKE ? OR service LIKE ? OR trace_id LIKE ?
 		ORDER BY timestamp DESC
@@ -257,10 +286,55 @@ func (s *Store) SearchEvents(query string, limit int) ([]model.Event, error) {
 	var events []model.Event
 	for rows.Next() {
 		var e model.Event
-		err := rows.Scan(&e.ID, &e.Timestamp, &e.Level, &e.Service, &e.Name, &e.TraceID)
+		var dataStr sql.NullString
+		err := rows.Scan(&e.ID, &e.Timestamp, &e.Level, &e.Service, &e.Name, &e.TraceID, &dataStr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan event: %w", err)
 		}
+
+		if dataStr.Valid && dataStr.String != "" {
+			err = json.Unmarshal([]byte(dataStr.String), &e.Data)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal event data: %w", err)
+			}
+		}
+
+		events = append(events, e)
+	}
+
+	return events, rows.Err()
+}
+
+func (s *Store) GetEventsByTraceID(traceID string) ([]model.Event, error) {
+	query := `
+		SELECT id, timestamp, level, service, name, trace_id, data
+		FROM events
+		WHERE trace_id = ?
+		ORDER BY timestamp ASC
+	`
+
+	rows, err := s.db.Query(query, traceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query events by trace ID: %w", err)
+	}
+	defer rows.Close()
+
+	var events []model.Event
+	for rows.Next() {
+		var e model.Event
+		var dataStr sql.NullString
+		err := rows.Scan(&e.ID, &e.Timestamp, &e.Level, &e.Service, &e.Name, &e.TraceID, &dataStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan event: %w", err)
+		}
+
+		if dataStr.Valid && dataStr.String != "" {
+			err = json.Unmarshal([]byte(dataStr.String), &e.Data)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal event data: %w", err)
+			}
+		}
+
 		events = append(events, e)
 	}
 

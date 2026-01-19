@@ -168,3 +168,27 @@ func EventsHandler(s *store.Store) http.HandlerFunc {
 		json.NewEncoder(w).Encode(events)
 	}
 }
+
+func TraceEventsHandler(s *store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		traceID := r.URL.Query().Get("trace_id")
+		if traceID == "" {
+			http.Error(w, "trace_id parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		events, err := s.GetEventsByTraceID(traceID)
+		if err != nil {
+			http.Error(w, "Failed to fetch trace events", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(events)
+	}
+}
