@@ -143,6 +143,32 @@ func StatusHandler(demoEnabled bool) http.HandlerFunc {
 	}
 }
 
+func ThroughputHandler(s *store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		hoursStr := r.URL.Query().Get("hours")
+		hours := 24
+		if hoursStr != "" {
+			if h, err := strconv.Atoi(hoursStr); err == nil && h > 0 {
+				hours = h
+			}
+		}
+
+		throughput, err := s.GetThroughput(hours)
+		if err != nil {
+			http.Error(w, "Failed to fetch throughput", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(throughput)
+	}
+}
+
 func EventsHandler(s *store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {

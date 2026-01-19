@@ -341,6 +341,51 @@ func (s *Store) GetEventsByTraceID(traceID string) ([]model.Event, error) {
 	return events, rows.Err()
 }
 
+type ThroughputData struct {
+	Time   string `json:"time"`
+	Events int    `json:"events"`
+}
+
+func (s *Store) GetThroughput(hours int) ([]ThroughputData, error) {
+	if hours <= 0 {
+		hours = 24
+	}
+
+	// Calculate events per hour for the last N hours
+	query := `
+		WITH hours AS (
+			SELECT strftime('%Y-%m-%d %H:00:00', datetime('now', '-' || (t.n * 1) || ' hours')) as hour_start
+			FROM (SELECT 0 as n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10 UNION ALL SELECT 11 UNION ALL SELECT 12 UNION ALL SELECT 13 UNION ALL SELECT 14 UNION ALL SELECT 15 UNION ALL SELECT 16 UNION ALL SELECT 17 UNION ALL SELECT 18 UNION ALL SELECT 19 UNION ALL SELECT 20 UNION ALL SELECT 21 UNION ALL SELECT 22 UNION ALL SELECT 23) t
+			WHERE t.n < ?
+		)
+		SELECT
+			strftime('%H:00', h.hour_start) as time,
+			COUNT(e.id) as events
+		FROM hours h
+		LEFT JOIN events e ON e.timestamp >= h.hour_start AND e.timestamp < datetime(h.hour_start, '+1 hour')
+		GROUP BY h.hour_start
+		ORDER BY h.hour_start ASC
+	`
+
+	rows, err := s.db.Query(query, hours)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query throughput: %w", err)
+	}
+	defer rows.Close()
+
+	var results []ThroughputData
+	for rows.Next() {
+		var t ThroughputData
+		err := rows.Scan(&t.Time, &t.Events)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan throughput data: %w", err)
+		}
+		results = append(results, t)
+	}
+
+	return results, rows.Err()
+}
+
 func (s *Store) Close() error {
 	return s.db.Close()
 }

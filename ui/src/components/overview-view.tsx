@@ -4,23 +4,15 @@ import { useNavigate } from "@tanstack/react-router"
 import { cn } from "~/lib/utils"
 import { useStats } from "~/hooks/use-stats"
 import { useErrorsByService } from "~/hooks/use-errors-by-service"
+import { useThroughput } from "~/hooks/use-throughput"
 
 interface OverviewViewProps {}
 
-const throughputData = [
-   { time: "00:00", events: 120 },
-   { time: "04:00", events: 85 },
-   { time: "08:00", events: 210 },
-   { time: "12:00", events: 380 },
-   { time: "16:00", events: 420 },
-   { time: "20:00", events: 290 },
-   { time: "Now", events: 340 },
-]
-
 export function OverviewView({}: OverviewViewProps) {
-    const navigate = useNavigate()
-   const { data: stats, isLoading: statsLoading } = useStats()
-   const { data: errorsByService, isLoading: errorsLoading } = useErrorsByService()
+     const navigate = useNavigate()
+    const { data: stats, isLoading: statsLoading } = useStats()
+    const { data: errorsByService, isLoading: errorsLoading } = useErrorsByService()
+    const { data: throughputData } = useThroughput(24)
 
    if (statsLoading || errorsLoading) {
       return (
@@ -67,12 +59,18 @@ export function OverviewView({}: OverviewViewProps) {
         ]
       : []
 
-   const errorsData =
-      errorsByService?.map(e => ({
-         service: e.service,
-         errors: e.count,
-         color: "#e25c5c", // Use consistent color for errors
-      })) || []
+    // Process throughput data to show events per second
+    const processedThroughputData = throughputData?.map(item => ({
+        time: item.time,
+        events: Math.round(item.events / 3600 * 100) / 100, // Convert to events per second with 2 decimal places
+    })) || []
+
+    const errorsData =
+       errorsByService?.map(e => ({
+          service: e.service,
+          errors: e.count,
+          color: "#e25c5c", // Use consistent color for errors
+       })) || []
 
    return (
       <div className="h-full overflow-auto p-6 custom-scrollbar bg-[#0b0b0b]">
@@ -145,47 +143,49 @@ export function OverviewView({}: OverviewViewProps) {
                      </div>
                   </div>
                </div>
-               <div className="h-60 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                     <AreaChart data={throughputData}>
-                        <defs>
-                           <linearGradient id="proGradient" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#2081e2" stopOpacity={0.2} />
-                              <stop offset="100%" stopColor="#2081e2" stopOpacity={0} />
-                           </linearGradient>
-                        </defs>
-                        <XAxis
-                           dataKey="time"
-                           axisLine={false}
-                           tickLine={false}
-                           tick={{ fill: "#525252", fontSize: 10, fontWeight: 600 }}
-                           dy={10}
-                        />
-                        <YAxis
-                           axisLine={false}
-                           tickLine={false}
-                           tick={{ fill: "#525252", fontSize: 10, fontWeight: 600 }}
-                           dx={-10}
-                        />
-                        <Tooltip
-                           contentStyle={{
-                              backgroundColor: "#1a1a1a",
-                              borderColor: "#262626",
-                              borderRadius: "8px",
-                              color: "#fff",
-                           }}
-                           itemStyle={{ color: "#2081e2" }}
-                        />
-                        <Area
-                           type="monotone"
-                           dataKey="events"
-                           stroke="#2081e2"
-                           strokeWidth={2}
-                           fill="url(#proGradient)"
-                        />
-                     </AreaChart>
-                  </ResponsiveContainer>
-               </div>
+                <div className="h-60 w-full">
+                   <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={processedThroughputData}>
+                         <defs>
+                            <linearGradient id="proGradient" x1="0" y1="0" x2="0" y2="1">
+                               <stop offset="0%" stopColor="#2081e2" stopOpacity={0.2} />
+                               <stop offset="100%" stopColor="#2081e2" stopOpacity={0} />
+                            </linearGradient>
+                         </defs>
+                         <XAxis
+                            dataKey="time"
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: "#525252", fontSize: 10, fontWeight: 600 }}
+                            dy={10}
+                         />
+                         <YAxis
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: "#525252", fontSize: 10, fontWeight: 600 }}
+                            dx={-10}
+                            label={{ value: 'evt/sec', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#525252', fontSize: 10, fontWeight: 600 } }}
+                         />
+                         <Tooltip
+                            contentStyle={{
+                               backgroundColor: "#1a1a1a",
+                               borderColor: "#262626",
+                               borderRadius: "8px",
+                               color: "#fff",
+                            }}
+                            itemStyle={{ color: "#2081e2" }}
+                            formatter={(value: number | undefined) => value !== undefined ? [`${value} evt/sec`, 'Events'] : ['', 'Events']}
+                         />
+                         <Area
+                            type="monotone"
+                            dataKey="events"
+                            stroke="#2081e2"
+                            strokeWidth={2}
+                            fill="url(#proGradient)"
+                         />
+                      </AreaChart>
+                   </ResponsiveContainer>
+                </div>
             </div>
 
             {/* "Top Collections" Style List for Errors */}
