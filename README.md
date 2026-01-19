@@ -102,6 +102,17 @@ Start the server on a specific port with demo data disabled:
 scopion start --port 3000 --demo=false
 ```
 
+#### Benchmarking Commands
+
+Scopion includes comprehensive benchmarking tools for testing database performance and limits:
+
+- `scopion benchmark standard`: Run standard load tests
+- `scopion benchmark stress`: Progressive stress testing to find breaking points
+- `scopion benchmark limits`: Comprehensive database limits testing
+- `scopion benchmark monitor`: Continuous performance monitoring
+
+See [BENCHMARKING.md](BENCHMARKING.md) for detailed benchmarking documentation and usage examples.
+
 #### Other Commands
 
 - `scopion version`: Display the version information

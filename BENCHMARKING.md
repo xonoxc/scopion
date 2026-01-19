@@ -6,6 +6,8 @@ This document describes the comprehensive benchmarking system for testing SQLite
 
 The benchmarking system provides multiple tools to stress test your SQLite database and determine when you should consider switching to a more scalable database solution like PostgreSQL or MySQL.
 
+📊 **View Real Benchmark Results**: See [Benchmarks.md](Benchmarks.md) for comprehensive performance data and analysis from actual test runs.
+
 ## Benchmark Commands
 
 ### Standard Benchmark
@@ -91,6 +93,14 @@ This runs continuous monitoring and alerts on performance degradation. Press Ctr
 - Low-traffic applications (<100 concurrent users)
 - Read-heavy workloads
 - Simple data models
+
+### Real Benchmark Data
+
+📊 **View Actual Performance Results**: [Benchmarks.md](Benchmarks.md) contains comprehensive benchmark data from real test runs, including:
+- Detailed performance metrics across different concurrency levels
+- Actual throughput and latency measurements
+- Error rate analysis under load
+- Specific recommendations based on empirical data
 
 ## Example Usage
 
