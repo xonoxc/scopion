@@ -30,7 +30,7 @@ func NewMonitor(dbPath string) *Monitor {
 func (m *Monitor) Start(ctx context.Context, result *BenchmarkResult) {
 	m.result = result
 
-	ticker := time.NewTicker(5 * time.Second) // Less frequent to reduce overhead
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -47,35 +47,30 @@ func (m *Monitor) Start(ctx context.Context, result *BenchmarkResult) {
 
 func (m *Monitor) Stop() {
 	close(m.stopChan)
-	m.collectStats() // Final collection
+	m.collectStats()
 }
 
 func (m *Monitor) collectStats() {
 	stats := SystemStats{}
 
-	// Basic memory stats using runtime
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 	stats.MemoryMB = float64(memStats.Alloc) / 1024 / 1024
 	m.result.MemoryUsageMB = stats.MemoryMB
 
-	// CPU - simplified (just goroutines as proxy for activity)
 	stats.CPUUsage = float64(runtime.NumGoroutine())
 
-	// Database file size
 	if info, err := os.Stat(m.dbPath); err == nil {
 		m.result.DatabaseSizeMB = float64(info.Size()) / 1024 / 1024
 	}
 
-	// Simplified disk stats (just track connections as active operations)
 	stats.Connections = runtime.NumGoroutine()
 
 	m.result.SystemStats = stats
 }
 
-// RateLimiter controls the rate of event generation
 type RateLimiter struct {
-	rate       int // events per second
+	rate       int
 	interval   time.Duration
 	lastTime   time.Time
 	permits    int64
@@ -97,7 +92,6 @@ func (rl *RateLimiter) Acquire() {
 		now := time.Now()
 		timePassed := now.Sub(rl.lastTime)
 
-		// Replenish permits based on time passed
 		newPermits := int64(timePassed / rl.interval)
 		if newPermits > 0 {
 			atomic.AddInt64(&rl.permits, newPermits)
@@ -107,18 +101,15 @@ func (rl *RateLimiter) Acquire() {
 			rl.lastTime = now
 		}
 
-		// Try to acquire a permit
 		if atomic.LoadInt64(&rl.permits) > 0 {
 			atomic.AddInt64(&rl.permits, -1)
 			return
 		}
 
-		// Wait a bit before trying again
 		time.Sleep(rl.interval / 10)
 	}
 }
 
-// DatabaseStressTest runs extreme stress tests to find SQLite limits
 type DatabaseStressTest struct {
 	config BenchmarkConfig
 	store  *store.Store
@@ -139,7 +130,6 @@ func NewDatabaseStressTest(config BenchmarkConfig) (*DatabaseStressTest, error) 
 func (dst *DatabaseStressTest) RunMemoryExhaustionTest(ctx context.Context) (*BenchmarkResult, error) {
 	log.Println("Running memory exhaustion test...")
 
-	// Create events with increasingly large payloads
 	config := dst.config
 	config.Workers = 10
 	config.BatchSize = 1

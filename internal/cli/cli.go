@@ -43,12 +43,10 @@ const scorpionArt = `
 Single-binary observability
 `
 
-// loggingMiddleware logs HTTP requests with method, path, status, and duration
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
-		// Wrap the ResponseWriter to capture status code
 		wrapped := &responseWriter{ResponseWriter: w, statusCode: 200}
 
 		next.ServeHTTP(wrapped, r)
@@ -58,7 +56,6 @@ func loggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// responseWriter wraps http.ResponseWriter to capture status code
 type responseWriter struct {
 	http.ResponseWriter
 	statusCode int
@@ -131,11 +128,9 @@ func startServerWithConfig(ctx context.Context, port string, config ServerConfig
 
 	server := &http.Server{Addr: ":" + port, Handler: nil}
 
-	// Channel to listen for shutdown signals
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
 
-	// Start server in a goroutine
 	go func() {
 		log.Printf("Server starting on :%s", port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -143,7 +138,6 @@ func startServerWithConfig(ctx context.Context, port string, config ServerConfig
 		}
 	}()
 
-	// Wait for shutdown signal or context cancellation
 	select {
 	case sig := <-shutdown:
 		log.Printf("Received signal %v, shutting down gracefully...", sig)
@@ -151,15 +145,13 @@ func startServerWithConfig(ctx context.Context, port string, config ServerConfig
 		log.Println("Context cancelled, shutting down gracefully...")
 	}
 
-	// Create a deadline for shutdown
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Gracefully shutdown the server
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		if err == context.DeadlineExceeded {
 			log.Println("Shutdown timeout exceeded, server may still be shutting down...")
-			return nil // Don't return error for timeout, server will still shut down
+			return nil
 		} else {
 			log.Printf("Server shutdown error: %v", err)
 			return err
@@ -277,7 +269,6 @@ var benchStressCmd = &cobra.Command{
 			fmt.Printf("  Errors: %d\n", result.ErrorCount)
 		}
 
-		// Analyze results
 		analyzer := benchmark.NewPerformanceAnalyzer(results)
 		recommendation := analyzer.Analyze()
 
@@ -293,7 +284,7 @@ var benchStressCmd = &cobra.Command{
 				StartTime: results[0].StartTime,
 				EndTime:   results[len(results)-1].EndTime,
 				Tests:     make([]benchmark.TestResult, len(results)),
-				Analysis:  benchmark.DatabaseAnalysis{}, // Would need to generate
+				Analysis:  benchmark.DatabaseAnalysis{},
 			}
 
 			for i, result := range results {
@@ -362,14 +353,12 @@ var benchMonitorCmd = &cobra.Command{
 			return fmt.Errorf("failed to start monitor: %w", err)
 		}
 
-		// Wait for interrupt
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		<-sigChan
 
 		monitor.Stop()
 
-		// Generate final report
 		results := monitor.GetResults()
 		if len(results) > 0 {
 			trend := monitor.GenerateTrendReport()
@@ -402,7 +391,6 @@ func init() {
 	startCmd.Flags().StringVarP(&port, "port", "p", "8080", "Port to run the server on")
 	startCmd.Flags().BoolVar(&enableDemo, "demo", true, "Enable demo data generation")
 
-	// Benchmark command flags
 	benchStandardCmd.Flags().IntVarP(&benchWorkers, "workers", "w", 10, "Number of concurrent workers")
 	benchStandardCmd.Flags().DurationVarP(&benchDuration, "duration", "d", 30*time.Second, "Benchmark duration")
 	benchStandardCmd.Flags().IntVarP(&benchRate, "rate", "r", 0, "Target events per second (0 for unlimited)")
@@ -422,7 +410,6 @@ func init() {
 	benchMonitorCmd.Flags().DurationVarP(&benchDuration, "duration", "d", 10*time.Second, "Duration per monitoring test")
 	benchMonitorCmd.Flags().IntVarP(&benchRate, "rate", "r", 100, "Target events per second for monitoring")
 
-	// Add benchmark subcommands
 	benchmarkCmd.AddCommand(benchStandardCmd)
 	benchmarkCmd.AddCommand(benchStressCmd)
 	benchmarkCmd.AddCommand(benchLimitsCmd)
@@ -433,7 +420,6 @@ func init() {
 	rootCmd.AddCommand(benchmarkCmd)
 }
 
-// Execute runs the CLI application
 func Execute() error {
 	return rootCmd.Execute()
 }

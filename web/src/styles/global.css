@@ -2,70 +2,58 @@
 
 /* Custom CSS Variables for Theme (Converted from Tailwind v3 config) */
 :root {
-  --color-page: #05050A; /* Very dark background */
-  --color-card: #0F0F16; /* Slightly lighter for cards */
-  --color-primary: #8B5CF6; /* Violet */
-  --color-secondary: #A78BFA; /* Lighter Violet */
-  --color-accent: #EC4899; /* Pinkish accent for gradients */
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-text-primary: #ffffff;
-  --color-text-secondary: #a1a1aa;
-  --color-text-muted: #71717a;
-
-  /* Font family */
+  /* Premium Dark Theme Palette */
+  --bg-canvas: #05050A;      /* Deepest background */
+  --bg-surface: #0F0F16;     /* Card background */
+  --bg-surface-hover: #181820;
+  
+  --color-primary: #8B5CF6;
+  --color-primary-dim: rgba(139, 92, 246, 0.1);
+  --color-secondary: #A78BFA;
+  --color-accent: #EC4899;
+  
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-highlight: rgba(255, 255, 255, 0.12);
+  
+  --text-primary: #FFFFFF;
+  --text-secondary: #A1A1AA;
+  --text-muted: #71717A;
+  
   --font-sans: 'Inter', sans-serif;
 }
 
-/* Custom Utilities (Converted from Tailwind v3 config) */
 @layer utilities {
   .bg-page {
-    background-color: var(--color-page);
+    background-color: var(--bg-canvas);
   }
-
+  
   .bg-card {
-    background-color: var(--color-card);
+    background-color: var(--bg-surface);
   }
 
-  .text-primary {
-    color: var(--color-primary);
+  /* Strict Spacing Helpers */
+  .gap-strict {
+    gap: 1.5rem; /* 24px standard gap */
+  }
+  
+  .p-strict {
+    padding: 1.5rem; /* 24px standard padding */
   }
 
-  .text-secondary {
-    color: var(--color-secondary);
+  /* Text Styles */
+  .text-primary { color: var(--color-primary); }
+  .text-secondary { color: var(--color-secondary); }
+  .text-muted { color: var(--text-muted); }
+  
+  .border-subtle { border-color: var(--border-subtle); }
+  
+  /* Glass/Blur Utils */
+  .glass-panel {
+    background: rgba(15, 15, 22, 0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-subtle);
   }
 
-  .text-accent {
-    color: var(--color-accent);
-  }
-
-  .border-primary {
-    border-color: var(--color-primary);
-  }
-
-  .bg-primary {
-    background-color: var(--color-primary);
-  }
-
-  .bg-secondary {
-    background-color: var(--color-secondary);
-  }
-
-  .bg-accent {
-    background-color: var(--color-accent);
-  }
-
-  .text-card {
-    color: var(--color-card);
-  }
-
-  /* Background images from config */
-  .bg-hero-glow {
-    background-image: radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.15) 0%, rgba(5, 5, 10, 0) 50%);
-  }
-
-  .bg-grid-pattern {
-    background-image: linear-gradient(to right, #1f1f2e 1px, transparent 1px), linear-gradient(to bottom, #1f1f2e 1px, transparent 1px);
-  }
 
   /* Custom gradient utilities */
   .bg-linear-to-r {

@@ -117,29 +117,29 @@ export function ServicesView() {
                                        x2="0"
                                        y2="1"
                                     >
-                                       <stop
-                                          offset="0%"
-                                          stopColor={
-                                             service.status === "errors" ? "#e25c5c" : "#3b9e8c"
-                                          }
-                                          stopOpacity={0.3}
-                                       />
-                                       <stop
-                                          offset="100%"
-                                          stopColor={
-                                             service.status === "errors" ? "#e25c5c" : "#3b9e8c"
-                                          }
-                                          stopOpacity={0}
-                                       />
+                                        <stop
+                                           offset="0%"
+                                           stopColor={
+                                              service.status === "errors" ? "hsl(var(--destructive))" : "hsl(var(--success))"
+                                           }
+                                           stopOpacity={0.3}
+                                        />
+                                        <stop
+                                           offset="100%"
+                                           stopColor={
+                                              service.status === "errors" ? "hsl(var(--destructive))" : "hsl(var(--success))"
+                                           }
+                                           stopOpacity={0}
+                                        />
                                     </linearGradient>
                                  </defs>
-                                 <Area
-                                    type="monotone"
-                                    dataKey="value"
-                                    stroke={service.status === "errors" ? "#e25c5c" : "#3b9e8c"}
-                                    strokeWidth={1.5}
-                                    fill={`url(#spark-${service.name})`}
-                                 />
+                                  <Area
+                                     type="monotone"
+                                     dataKey="value"
+                                     stroke={service.status === "errors" ? "hsl(var(--destructive))" : "hsl(var(--success))"}
+                                     strokeWidth={1.5}
+                                     fill={`url(#spark-${service.name})`}
+                                  />
                               </AreaChart>
                            </ResponsiveContainer>
                         </div>

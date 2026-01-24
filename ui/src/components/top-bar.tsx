@@ -43,25 +43,25 @@ export function TopBar({ currentView }: TopBarProps) {
 
    // TopBar inspired by OpenSea Pro - Flat, Matte, Functional
    return (
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-[#262626] bg-[#0b0b0b] px-8 h-16">
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background px-8 h-16">
          <div className="flex items-center gap-8">
              {/* Simple Title */}
             <h1 className="text-lg font-bold text-white flex items-center gap-3">
                {viewTitles[currentView]}
             </h1>
             
-            {/* Status Pill - Minimal */}
-             <div className="flex items-center gap-2.5 rounded-full bg-[#1a1a1a] border border-[#262626] px-3 py-1.5">
-                <div
-                   className={cn(
-                      "h-2 w-2 rounded-full",
-                      status === "ingesting" ? "bg-emerald-500" : "bg-[#525252]"
-                   )}
-                />
-                <span className="text-[11px] font-medium text-[#a3a3a3] capitalize">{status}</span>
-                <div className="h-3 w-px bg-[#333]" />
-                <span className="text-[11px] font-mono text-[#e5e5e5]">{eventRate} evt/s</span>
-             </div>
+             {/* Status Pill - Minimal */}
+              <div className="flex items-center gap-2.5 rounded-full bg-muted border border-border px-3 py-1.5">
+                 <div
+                    className={cn(
+                       "h-2 w-2 rounded-full",
+                       status === "ingesting" ? "bg-success" : "bg-muted-foreground"
+                    )}
+                 />
+                 <span className="text-[11px] font-medium text-secondary-foreground capitalize">{status}</span>
+                 <div className="h-3 w-px bg-border" />
+                 <span className="text-[11px] font-mono text-card-foreground">{eventRate} evt/s</span>
+              </div>
 
              {/* Demo Mode Badge */}
              {serverStatus?.demo_enabled && (
@@ -74,7 +74,7 @@ export function TopBar({ currentView }: TopBarProps) {
 
          <div className="flex items-center gap-4">
              <SearchBar />
-             <div className="h-6 w-px bg-[#262626]" />
+              <div className="h-6 w-px bg-border" />
              <DateRangePicker />
              <NotificationsButton />
             <RefreshButton />

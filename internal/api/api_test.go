@@ -77,7 +77,7 @@ func TestTraceEventsHandler(t *testing.T) {
 
 	// Insert multiple events for the same trace
 	baseTime := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		ts := baseTime.Add(time.Duration(i) * time.Second)
 		dataJSON := fmt.Sprintf(`{"step": %d, "value": %d}`, i, i*10)
 		_, err = db.Exec(`INSERT INTO events (id, timestamp, level, service, name, trace_id, data) VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -115,7 +115,7 @@ func TestTraceEventsHandler(t *testing.T) {
 	}
 
 	// Check ordering and data
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if events[i].ID != fmt.Sprintf("event-%d", i) {
 			t.Errorf("Expected event ID event-%d, got %s", i, events[i].ID)
 		}

@@ -9,7 +9,6 @@ import (
 	"time"
 )
 
-// BenchmarkRunner coordinates benchmark execution and analysis
 type BenchmarkRunner struct {
 	config BenchmarkConfig
 }
@@ -18,7 +17,6 @@ func NewBenchmarkRunner(config BenchmarkConfig) *BenchmarkRunner {
 	return &BenchmarkRunner{config: config}
 }
 
-// RunStandardBenchmark runs a standard load test
 func (br *BenchmarkRunner) RunStandardBenchmark() (*BenchmarkResult, error) {
 	log.Printf("Running standard benchmark: %d workers, %v duration",
 		br.config.Workers, br.config.Duration)
@@ -31,7 +29,6 @@ func (br *BenchmarkRunner) RunStandardBenchmark() (*BenchmarkResult, error) {
 	return generator.Run(nil)
 }
 
-// RunStressTest runs a progressive stress test to find breaking points
 func (br *BenchmarkRunner) RunStressTest() ([]BenchmarkResult, error) {
 	log.Println("Running progressive stress test...")
 
@@ -43,7 +40,6 @@ func (br *BenchmarkRunner) RunStressTest() ([]BenchmarkResult, error) {
 	return generator.StressTest(nil, 100, 10*time.Minute)
 }
 
-// RunDatabaseLimitsTest runs extreme tests to find SQLite limits
 func (br *BenchmarkRunner) RunDatabaseLimitsTest() (*DatabaseLimitsReport, error) {
 	log.Println("Running database limits test...")
 
@@ -298,7 +294,6 @@ func (cm *ContinuousMonitor) runQuickTest() {
 
 	runner := NewBenchmarkRunner(config)
 	result, err := runner.RunStandardBenchmark()
-
 	if err != nil {
 		log.Printf("Continuous monitor test failed: %v", err)
 		return

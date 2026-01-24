@@ -9,10 +9,10 @@ import { useThroughput } from "~/hooks/use-throughput"
 interface OverviewViewProps {}
 
 export function OverviewView({}: OverviewViewProps) {
-     const navigate = useNavigate()
-    const { data: stats, isLoading: statsLoading } = useStats()
-    const { data: errorsByService, isLoading: errorsLoading } = useErrorsByService()
-    const { data: throughputData } = useThroughput(24)
+   const navigate = useNavigate()
+   const { data: stats, isLoading: statsLoading } = useStats()
+   const { data: errorsByService, isLoading: errorsLoading } = useErrorsByService()
+   const { data: throughputData } = useThroughput(24)
 
    if (statsLoading || errorsLoading) {
       return (
@@ -59,21 +59,22 @@ export function OverviewView({}: OverviewViewProps) {
         ]
       : []
 
-    // Process throughput data to show events per second
-    const processedThroughputData = throughputData?.map(item => ({
-        time: item.time,
-        events: Math.round(item.events / 3600 * 100) / 100, // Convert to events per second with 2 decimal places
-    })) || []
+   // Process throughput data to show events per second
+   const processedThroughputData =
+      throughputData?.map(item => ({
+         time: item.time,
+         events: Math.round((item.events / 3600) * 100) / 100, // Convert to events per second with 2 decimal places
+      })) || []
 
-    const errorsData =
-       errorsByService?.map(e => ({
-          service: e.service,
-          errors: e.count,
-          color: "#e25c5c", // Use consistent color for errors
-       })) || []
+   const errorsData =
+      errorsByService?.map(e => ({
+         service: e.service,
+         errors: e.count,
+         color: "hsl(var(--destructive))", // Use consistent color for errors
+      })) || []
 
    return (
-      <div className="h-full overflow-auto p-6 custom-scrollbar bg-[#0b0b0b]">
+      <div className="h-full overflow-auto p-6 custom-scrollbar bg-background">
          {/* Stats Grid - OpenSea Pro Style Cards */}
          <div className="grid grid-cols-4 gap-4 mb-6">
             {statsData.map(stat => {
@@ -81,10 +82,10 @@ export function OverviewView({}: OverviewViewProps) {
                return (
                   <div
                      key={stat.label}
-                     className="group relative overflow-hidden rounded-xl border border-[#262626] bg-[#121212] p-5 transition-all hover:border-[#404040]"
+                     className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 transition-all hover:border-accent"
                   >
                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-[13px] font-semibold text-[#8a8a8a]">
+                        <span className="text-[13px] font-semibold text-muted-foreground">
                            {stat.label}
                         </span>
                         <Icon
@@ -95,14 +96,14 @@ export function OverviewView({}: OverviewViewProps) {
                         />
                      </div>
                      <div className="flex items-end justify-between">
-                        <div className="text-2xl font-bold text-white tracking-tight">
+                        <div className="text-2xl font-bold text-foreground tracking-tight">
                            {stat.value}
                         </div>
                         {stat.trend !== "neutral" && (
                            <div
                               className={cn(
                                  "text-[11px] font-bold flex items-center gap-1",
-                                 stat.trend === "up" ? "text-[#34d69b]" : "text-[#f76dc0]"
+                                 stat.trend === "up" ? "text-success" : "text-destructive"
                               )}
                            >
                               {stat.trend === "up" ? "+" : ""}
@@ -119,22 +120,22 @@ export function OverviewView({}: OverviewViewProps) {
 
          <div className="grid grid-cols-3 gap-6">
             {/* Main Chart Area - "Price History" vibe */}
-            <div className="col-span-2 rounded-xl border border-[#262626] bg-[#121212] p-5">
+            <div className="col-span-2 rounded-xl border border-border bg-card p-5">
                <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-4">
-                     <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                        <Activity className="h-4 w-4 text-[#2081e2]" />
+                     <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                        <Activity className="h-4 w-4 text-primary" />
                         Event Volume
                      </h3>
-                     <div className="flex items-center bg-[#1a1a1a] rounded-lg p-0.5 border border-[#262626]">
+                     <div className="flex items-center bg-muted rounded-lg p-0.5 border border-border">
                         {["1h", "6h", "24h", "7d"].map((range, i) => (
                            <button
                               key={range}
                               className={cn(
                                  "px-3 py-1 text-[11px] font-semibold rounded-md transition-all",
                                  i === 2
-                                    ? "bg-[#262626] text-white shadow-sm"
-                                    : "text-[#8a8a8a] hover:text-[#e5e5e5]"
+                                    ? "bg-accent text-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-card-foreground"
                               )}
                            >
                               {range}
@@ -143,91 +144,113 @@ export function OverviewView({}: OverviewViewProps) {
                      </div>
                   </div>
                </div>
-                <div className="h-60 w-full">
-                   <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={processedThroughputData}>
-                         <defs>
-                            <linearGradient id="proGradient" x1="0" y1="0" x2="0" y2="1">
-                               <stop offset="0%" stopColor="#2081e2" stopOpacity={0.2} />
-                               <stop offset="100%" stopColor="#2081e2" stopOpacity={0} />
-                            </linearGradient>
-                         </defs>
-                         <XAxis
-                            dataKey="time"
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: "#525252", fontSize: 10, fontWeight: 600 }}
-                            dy={10}
-                         />
-                         <YAxis
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: "#525252", fontSize: 10, fontWeight: 600 }}
-                            dx={-10}
-                            label={{ value: 'evt/sec', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#525252', fontSize: 10, fontWeight: 600 } }}
-                         />
-                         <Tooltip
-                            contentStyle={{
-                               backgroundColor: "#1a1a1a",
-                               borderColor: "#262626",
-                               borderRadius: "8px",
-                               color: "#fff",
-                            }}
-                            itemStyle={{ color: "#2081e2" }}
-                            formatter={(value: number | undefined) => value !== undefined ? [`${value} evt/sec`, 'Events'] : ['', 'Events']}
-                         />
-                         <Area
-                            type="monotone"
-                            dataKey="events"
-                            stroke="#2081e2"
-                            strokeWidth={2}
-                            fill="url(#proGradient)"
-                         />
-                      </AreaChart>
-                   </ResponsiveContainer>
-                </div>
+               <div className="h-60 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                     <AreaChart data={processedThroughputData}>
+                        <defs>
+                           <linearGradient id="proGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.2} />
+                              <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                           </linearGradient>
+                        </defs>
+                        <XAxis
+                           dataKey="time"
+                           axisLine={false}
+                           tickLine={false}
+                           tick={{
+                              fill: "hsl(var(--muted-foreground))",
+                              fontSize: 10,
+                              fontWeight: 600,
+                           }}
+                           dy={10}
+                        />
+                        <YAxis
+                           axisLine={false}
+                           tickLine={false}
+                           tick={{
+                              fill: "hsl(var(--muted-foreground))",
+                              fontSize: 10,
+                              fontWeight: 600,
+                           }}
+                           dx={-10}
+                           label={{
+                              value: "evt/sec",
+                              angle: -90,
+                              position: "insideLeft",
+                              style: {
+                                 textAnchor: "middle",
+                                 fill: "hsl(var(--muted-foreground))",
+                                 fontSize: 10,
+                                 fontWeight: 600,
+                              },
+                           }}
+                        />
+                        <Tooltip
+                           contentStyle={{
+                              backgroundColor: "hsl(var(--muted))",
+                              borderColor: "hsl(var(--border))",
+                              borderRadius: "8px",
+                              color: "hsl(var(--foreground))",
+                           }}
+                           itemStyle={{ color: "hsl(var(--primary))" }}
+                           formatter={(value: number | undefined) =>
+                              value !== undefined ? [`${value} evt/sec`, "Events"] : ["", "Events"]
+                           }
+                        />
+                        <Area
+                           type="monotone"
+                           dataKey="events"
+                           stroke="hsl(var(--primary))"
+                           strokeWidth={2}
+                           fill="url(#proGradient)"
+                        />
+                     </AreaChart>
+                  </ResponsiveContainer>
+               </div>
             </div>
 
             {/* "Top Collections" Style List for Errors */}
-            <div className="rounded-xl border border-[#262626] bg-[#121212] flex flex-col overflow-hidden">
-               <div className="p-4 border-b border-[#262626] flex items-center justify-between bg-[#141414]">
-                  <h3 className="text-sm font-bold text-white">Top Errors</h3>
+            <div className="rounded-xl border border-border bg-card flex flex-col overflow-hidden">
+               <div className="p-4 border-b border-border flex items-center justify-between bg-secondary">
+                  <h3 className="text-sm font-bold text-foreground">Top Errors</h3>
                   <button
                      onClick={() => navigate({ to: "/errors" })}
-                     className="text-[11px] font-semibold text-[#2081e2] hover:text-[#4aa8f2]"
+                     className="text-[11px] font-semibold text-primary hover:text-primary/80"
                   >
                      View All
                   </button>
                </div>
 
                <div className="flex-1 overflow-auto">
-                  <div className="grid grid-cols-[auto_1fr_auto] gap-x-4 px-4 py-2 border-b border-[#262626] text-[10px] font-bold text-[#8a8a8a] uppercase tracking-wider">
+                  <div className="grid grid-cols-[auto_1fr_auto] gap-x-4 px-4 py-2 border-b border-border text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                      <span>#</span>
                      <span>Service</span>
                      <span>Count</span>
                   </div>
-                  <div className="divide-y divide-[#1a1a1a]">
+                  <div className="divide-y divide-muted">
                      {errorsData.map((error, idx) => (
                         <div
                            key={error.service}
                            onClick={() => navigate({ to: "/errors" })}
-                           className="group grid grid-cols-[auto_1fr_auto] items-center gap-x-4 px-4 py-3 hover:bg-[#1a1a1a] cursor-pointer transition-colors"
+                           className="group grid grid-cols-[auto_1fr_auto] items-center gap-x-4 px-4 py-3 hover:bg-muted cursor-pointer transition-colors"
                         >
-                           <span className="text-xs font-medium text-[#525252] w-4">{idx + 1}</span>
+                           <span className="text-xs font-medium text-muted-foreground w-4">
+                              {idx + 1}
+                           </span>
                            <div className="flex items-center gap-3 overflow-hidden">
-                              <div className="h-8 w-8 rounded-lg bg-[#262626] flex items-center justify-center shrink-0">
-                                 <Server className="h-4 w-4 text-[#e5e5e5]" />
+                              <div className="h-8 w-8 rounded-lg bg-accent flex items-center justify-center shrink-0">
+                                 <Server className="h-4 w-4 text-card-foreground" />
                               </div>
                               <div className="flex flex-col min-w-0">
-                                 <span className="text-sm font-bold text-white truncate group-hover:text-[#2081e2] transition-colors">
+                                 <span className="text-sm font-bold text-foreground truncate group-hover:text-primary transition-colors">
                                     {error.service}
                                  </span>
                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-[10px] text-[#8a8a8a] truncate">
+                                    <span className="text-[10px] text-muted-foreground truncate">
                                        Backend
                                     </span>
                                     {idx < 2 && (
-                                       <span className="text-[10px] text-[#34d69b] font-bold">
+                                       <span className="text-[10px] text-success font-bold">
                                           +12%
                                        </span>
                                     )}
@@ -235,8 +258,10 @@ export function OverviewView({}: OverviewViewProps) {
                               </div>
                            </div>
                            <div className="flex flex-col items-end">
-                              <span className="text-sm font-bold text-white">{error.errors}</span>
-                              <span className="text-[10px] font-medium text-[#f76dc0]">
+                              <span className="text-sm font-bold text-foreground">
+                                 {error.errors}
+                              </span>
+                              <span className="text-[10px] font-medium text-destructive">
                                  High vol
                               </span>
                            </div>

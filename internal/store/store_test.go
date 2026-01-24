@@ -77,7 +77,7 @@ func TestSearchEvents(t *testing.T) {
 			Name:      "login",
 			TraceID:   "trace1",
 			Level:     "info",
-			Data:      map[string]interface{}{"user": "alice"},
+			Data:      map[string]any{"user": "alice"},
 		},
 		{
 			ID:        "event2",
@@ -86,7 +86,7 @@ func TestSearchEvents(t *testing.T) {
 			Name:      "request",
 			TraceID:   "trace2",
 			Level:     "info",
-			Data:      map[string]interface{}{"method": "GET"},
+			Data:      map[string]any{"method": "GET"},
 		},
 		{
 			ID:        "event3",
@@ -153,11 +153,11 @@ func TestAppendWithCustomData(t *testing.T) {
 	s := &Store{db: db}
 	defer s.Close()
 
-	customData := map[string]interface{}{
+	customData := map[string]any{
 		"user_id":    123,
 		"action":     "login",
 		"ip_address": "192.168.1.1",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"browser": "chrome",
 			"os":      "linux",
 		},
@@ -197,7 +197,7 @@ func TestAppendWithCustomData(t *testing.T) {
 	if event.Data["action"] != "login" {
 		t.Errorf("expected action login, got %v", event.Data["action"])
 	}
-	metadata, ok := event.Data["metadata"].(map[string]interface{})
+	metadata, ok := event.Data["metadata"].(map[string]any)
 	if !ok {
 		t.Fatal("expected metadata to be a map")
 	}
@@ -227,7 +227,7 @@ func TestGetEventsByTraceID(t *testing.T) {
 	baseTime := time.Now()
 
 	// Insert multiple events for the same trace
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		event := model.Event{
 			ID:        fmt.Sprintf("event-%d", i),
 			Timestamp: baseTime.Add(time.Duration(i) * time.Second),
@@ -235,7 +235,7 @@ func TestGetEventsByTraceID(t *testing.T) {
 			Name:      fmt.Sprintf("operation-%d", i),
 			TraceID:   traceID,
 			Level:     "info",
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"step":  i,
 				"value": i * 10,
 			},
@@ -246,7 +246,6 @@ func TestGetEventsByTraceID(t *testing.T) {
 		}
 	}
 
-	// Insert event for different trace
 	err = s.Append(model.Event{
 		ID:        "other-event",
 		Timestamp: baseTime,
@@ -267,8 +266,7 @@ func TestGetEventsByTraceID(t *testing.T) {
 		t.Fatalf("expected 3 events, got %d", len(events))
 	}
 
-	// Check ordering (should be ascending by timestamp)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if events[i].ID != fmt.Sprintf("event-%d", i) {
 			t.Errorf("expected event ID event-%d, got %s", i, events[i].ID)
 		}
@@ -297,7 +295,6 @@ func TestGetTraces(t *testing.T) {
 
 	baseTime := time.Now()
 
-	// Insert events for traces
 	events := []model.Event{
 		{
 			ID:        "event1",
@@ -340,39 +337,42 @@ func TestGetTraces(t *testing.T) {
 		t.Fatalf("expected 2 traces, got %d", len(traces))
 	}
 
-	// Check first trace (should be trace2 since it has later start_time)
 	trace2 := traces[0]
-	if trace2.ID != "trace2" {
+
+	switch true {
+	case trace2.ID != "trace2":
 		t.Errorf("expected trace ID trace2, got %s", trace2.ID)
-	}
-	if trace2.Service != "worker" {
+
+	case trace2.Service != "worker":
 		t.Errorf("expected service worker, got %s", trace2.Service)
-	}
-	if trace2.Spans != 1 {
+
+	case trace2.Spans != 1:
 		t.Errorf("expected 1 span, got %d", trace2.Spans)
-	}
-	if trace2.HasError != true {
+
+	case trace2.HasError != true:
 		t.Errorf("expected error, got %v", trace2.HasError)
-	}
-	if trace2.Duration != 0 {
+
+	case trace2.Duration != 0:
 		t.Errorf("expected duration 0ms, got %d", trace2.Duration)
+
 	}
 
-	// Check second trace (trace1)
 	trace1 := traces[1]
-	if trace1.ID != "trace1" {
+
+	switch true {
+	case trace1.ID != "trace1":
 		t.Errorf("expected trace ID trace1, got %s", trace1.ID)
-	}
-	if trace1.Service != "api" {
+
+	case trace1.Service != "api":
 		t.Errorf("expected service api, got %s", trace1.Service)
-	}
-	if trace1.Spans != 2 {
+
+	case trace1.Spans != 2:
 		t.Errorf("expected 2 spans, got %d", trace1.Spans)
-	}
-	if trace1.HasError != false {
+
+	case trace1.HasError != false:
 		t.Errorf("expected no error, got %v", trace1.HasError)
-	}
-	if trace1.Duration != 100 {
+
+	case trace1.Duration != 100:
 		t.Errorf("expected duration 100ms, got %d", trace1.Duration)
 	}
 }

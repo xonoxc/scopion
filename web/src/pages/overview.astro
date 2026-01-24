@@ -1,0 +1,29 @@
+---
+import "../styles/global.css";
+import { DashboardLayout } from "../components/dashboard/DashboardLayout";
+import { AgentHeader } from "../components/dashboard/AgentHeader";
+import { VariantMonitor } from "../components/dashboard/VariantMonitor";
+import { VariantGrid } from "../components/dashboard/VariantGrid";
+---
+
+<DashboardLayout client:load>
+    <div class="max-w-[1400px] mx-auto pb-20">
+        <AgentHeader client:visible />
+
+        <div class="space-y-8">
+            <VariantMonitor client:visible />
+
+            <div class="pt-4">
+                <div className="flex items-center justify-between mb-6">
+                    <h3
+                        class="text-sm font-bold text-gray-500 uppercase tracking-widest pl-1"
+                    >
+                        Other Variants
+                    </h3>
+                    <div class="h-px bg-white/5 flex-1 ml-6"></div>
+                </div>
+                <VariantGrid client:visible />
+            </div>
+        </div>
+    </div>
+</DashboardLayout>

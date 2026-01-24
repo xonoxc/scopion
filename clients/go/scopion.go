@@ -60,10 +60,12 @@ func (c *Client) GetEvents(limit int) ([]Event, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("unexpected status: %d", resp.StatusCode)
 	}
+
 	var events []Event
 	err = json.NewDecoder(resp.Body).Decode(&events)
 	return events, err
@@ -77,8 +79,10 @@ func (c *Client) SubscribeLive() (<-chan Event, error) {
 		if err != nil {
 			return
 		}
+
 		defer resp.Body.Close()
 		scanner := bufio.NewScanner(resp.Body)
+
 		for scanner.Scan() {
 			line := scanner.Text()
 			if after, ok := strings.CutPrefix(line, "data: "); ok {

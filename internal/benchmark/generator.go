@@ -18,8 +18,8 @@ type BenchmarkConfig struct {
 	Duration     time.Duration
 	Workers      int
 	BatchSize    int
-	EventRate    int // events per second target
-	MaxEvents    int // 0 for unlimited
+	EventRate    int
+	MaxEvents    int
 	EnableWAL    bool
 	EnableSync   bool
 	DatabasePath string
@@ -80,26 +80,21 @@ func (lg *LoadGenerator) Run(ctx context.Context) (*BenchmarkResult, error) {
 		ctx = context.Background()
 	}
 
-	log.Printf("Starting benchmark: %d workers, target %d events/sec, duration %v",
-		lg.config.Workers, lg.config.EventRate, lg.config.Duration)
+	log.Printf("Starting benchmark: %d workers, target %d events/sec, duration %v", lg.config.Workers, lg.config.EventRate, lg.config.Duration)
 
-	// Start monitoring
 	monitor := NewMonitor(lg.config.DatabasePath)
 	go monitor.Start(ctx, lg.results)
 
-	// Start workers
 	for i := 0; i < lg.config.Workers; i++ {
 		lg.wg.Add(1)
 		go lg.worker(ctx, i)
 	}
 
-	// Rate limiter if specified
 	if lg.config.EventRate > 0 {
 		// TODO: Implement rate limiting
 		_ = NewRateLimiter(lg.config.EventRate)
 	}
 
-	// Wait for duration or context cancellation
 	timer := time.NewTimer(lg.config.Duration)
 	defer timer.Stop()
 
@@ -110,22 +105,18 @@ func (lg *LoadGenerator) Run(ctx context.Context) (*BenchmarkResult, error) {
 		log.Println("Benchmark cancelled by context")
 	}
 
-	// Stop all workers
 	close(lg.stopChan)
 	lg.wg.Wait()
 
-	// Stop monitoring
 	if monitor != nil {
 		monitor.Stop()
 	}
 
-	// Collect final results
 	lg.results.EndTime = time.Now()
 	lg.results.Duration = lg.results.EndTime.Sub(lg.results.StartTime)
 
 	lg.calculateStats()
 
-	// Cleanup
 	if lg.store != nil {
 		lg.store.Close()
 	}
@@ -144,7 +135,6 @@ func (lg *LoadGenerator) worker(ctx context.Context, workerID int) {
 	for {
 		select {
 		case <-lg.stopChan:
-			// Drain remaining batch
 			if len(batch) > 0 {
 				lg.processBatch(batch)
 			}
@@ -154,20 +144,18 @@ func (lg *LoadGenerator) worker(ctx context.Context, workerID int) {
 		default:
 		}
 
-		// Generate event
 		event := lg.generateEvent(workerID)
 
 		if lg.config.BatchSize > 1 {
 			batch = append(batch, event)
 			if len(batch) >= lg.config.BatchSize {
 				lg.processBatch(batch)
-				batch = batch[:0] // reset batch
+				batch = batch[:0]
 			}
 		} else {
 			lg.processEvent(event)
 		}
 
-		// Check if we've reached max events
 		if lg.config.MaxEvents > 0 && atomic.LoadInt64(&lg.results.TotalEvents) >= int64(lg.config.MaxEvents) {
 			return
 		}
@@ -234,11 +222,11 @@ func (lg *LoadGenerator) generateEvent(workerID int) model.Event {
 		Name:      fmt.Sprintf("bench-operation-%d", rand.Intn(20)),
 		TraceID:   fmt.Sprintf("bench-trace-%d-%d", workerID, rand.Int63()),
 		Level:     []string{"info", "warn", "error"}[rand.Intn(3)],
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"worker_id": workerID,
 			"batch_id":  rand.Intn(1000),
 			"payload":   fmt.Sprintf("benchmark data %d", rand.Intn(10000)),
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"cpu":       runtime.NumCPU(),
 				"goroutine": runtime.NumGoroutine(),
 			},

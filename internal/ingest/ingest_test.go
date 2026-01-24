@@ -110,16 +110,18 @@ func TestHandlerWithCustomData(t *testing.T) {
 	if event.Data == nil {
 		t.Fatal("Expected custom data to be present")
 	}
-	if event.Data["user_id"] != 123.0 { // JSON numbers are floats
+	if event.Data["user_id"] != 123.0 {
 		t.Errorf("Expected user_id 123.0, got %v", event.Data["user_id"])
 	}
 	if event.Data["action"] != "login" {
 		t.Errorf("Expected action login, got %v", event.Data["action"])
 	}
-	device, ok := event.Data["device"].(map[string]interface{})
+
+	device, ok := event.Data["device"].(map[string]any)
 	if !ok {
 		t.Fatal("Expected device to be a map")
 	}
+
 	if device["type"] != "mobile" {
 		t.Errorf("Expected device type mobile, got %v", device["type"])
 	}
