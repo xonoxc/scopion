@@ -2,74 +2,73 @@ package dockerclient
 
 import (
 	"context"
-	"io"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/client"
-	"github.com/docker/go-connections/nat"
+	docker "github.com/fsouza/go-dockerclient"
 )
 
 type DockerService struct {
-	cli *client.Client
+	cli *docker.Client
 }
 
 func New() (*DockerService, error) {
-	cli, err := client.NewClientWithOpts(
-		client.FromEnv,
-		client.WithAPIVersionNegotiation(),
-	)
+	client, err := docker.NewClientFromEnv()
 	if err != nil {
 		return nil, err
 	}
 
-	return &DockerService{cli: cli}, nil
+	return &DockerService{
+		cli: client,
+	}, nil
 }
 
 func (d *DockerService) RunContainer(ctx context.Context, spec ContainerSpec) (*ContainerResult, error) {
-	reader, err := d.cli.ImagePull(ctx, spec.Image, types.ImagePullOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	io.Copy(io.Discard, reader)
-	reader.Close()
-
-	exposed := nat.PortSet{}
-	bindings := nat.PortMap{}
-
-	for cPort, hPort := range spec.Ports {
-		port := nat.Port(cPort)
-		exposed[port] = struct{}{}
-		bindings[port] = []nat.PortBinding{
-			{HostIP: "127.0.0.1", HostPort: hPort},
-		}
-	}
-
-	resp, err := d.cli.ContainerCreate(
-		ctx,
-		&container.Config{
-			Image:        spec.Image,
-			Env:          spec.Env,
-			ExposedPorts: exposed,
+	err := d.cli.PullImage(
+		docker.PullImageOptions{
+			Repository: spec.Image,
+			Context:    ctx,
 		},
-		&container.HostConfig{
-			PortBindings: bindings,
-		},
-		nil,
-		nil,
-		spec.Name,
+		docker.AuthConfiguration{},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := d.cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+	exposedPorts := map[docker.Port]struct{}{}
+	portBindings := map[docker.Port][]docker.PortBinding{}
+
+	for cPort, hPort := range spec.Ports {
+		port := docker.Port(cPort)
+		exposedPorts[port] = struct{}{}
+		portBindings[port] = []docker.PortBinding{
+			{
+				HostIP:   "127.0.0.1",
+				HostPort: hPort,
+			},
+		}
+	}
+
+	container, err := d.cli.CreateContainer(docker.CreateContainerOptions{
+		Name:    spec.Name,
+		Context: ctx,
+		Config: &docker.Config{
+			Image:        spec.Image,
+			Env:          spec.Env,
+			ExposedPorts: exposedPorts,
+		},
+		HostConfig: &docker.HostConfig{
+			PortBindings: portBindings,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if err := d.cli.StartContainer(container.ID, nil); err != nil {
 		return nil, err
 	}
 
 	return &ContainerResult{
-		ID:    resp.ID,
+		ID:    container.ID,
 		Name:  spec.Name,
 		Ports: spec.Ports,
 	}, nil
