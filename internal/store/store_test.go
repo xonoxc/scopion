@@ -9,6 +9,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
 	"github.com/xonoxc/scopion/internal/model"
+	"github.com/xonoxc/scopion/internal/store/sqlite"
 )
 
 func TestAppend(t *testing.T) {
@@ -25,7 +26,7 @@ func TestAppend(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := &Store{db: db}
+	s := sqlite.NewWithDB(db)
 	defer s.Close()
 
 	err = s.Append(model.Event{
@@ -63,7 +64,7 @@ func TestSearchEvents(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := &Store{db: db}
+	s := sqlite.NewWithDB(db)
 	defer s.Close()
 
 	baseTime := time.Now()
@@ -150,7 +151,7 @@ func TestAppendWithCustomData(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := &Store{db: db}
+	s := sqlite.NewWithDB(db)
 	defer s.Close()
 
 	customData := map[string]any{
@@ -220,7 +221,7 @@ func TestGetEventsByTraceID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := &Store{db: db}
+	s := sqlite.NewWithDB(db)
 	defer s.Close()
 
 	traceID := "trace123"
@@ -290,7 +291,7 @@ func TestGetTraces(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := &Store{db: db}
+	s := sqlite.NewWithDB(db)
 	defer s.Close()
 
 	baseTime := time.Now()

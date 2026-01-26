@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/xonoxc/scopion/internal/app"
 )
 
 func TestExecute(t *testing.T) {
@@ -49,7 +51,7 @@ func TestStartServerSignature(t *testing.T) {
 		defer cancel()
 
 		// This will fail due to missing migrations, but we just want to test it doesn't panic
-		err := startServer(ctx, "9999", false)
+		err := app.StartServer(ctx, "9999", app.DEMO_MODE)
 		if err == nil {
 			t.Error("Expected error due to missing migrations directory")
 		}
@@ -62,7 +64,7 @@ func TestStartServerSignature(t *testing.T) {
 		defer cancel()
 
 		// Test with demo=false
-		err1 := startServer(ctx, "9998", false)
+		err1 := app.StartServer(ctx, "9998", app.NORMAL_MODE)
 		if err1 == nil {
 			t.Error("Expected error due to missing migrations directory")
 		}
@@ -71,7 +73,7 @@ func TestStartServerSignature(t *testing.T) {
 		ctx2, cancel2 := context.WithTimeout(context.Background(), 1*time.Millisecond)
 		defer cancel2()
 
-		err2 := startServer(ctx2, "9997", true)
+		err2 := app.StartServer(ctx2, "9997", app.DEMO_MODE)
 		if err2 == nil {
 			t.Error("Expected error due to missing migrations directory")
 		}

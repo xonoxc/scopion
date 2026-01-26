@@ -7,7 +7,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
 	"github.com/xonoxc/scopion/internal/live"
-	"github.com/xonoxc/scopion/internal/store"
+	"github.com/xonoxc/scopion/internal/store/sqlite"
 )
 
 func TestGenerateCustomData(t *testing.T) {
@@ -49,7 +49,7 @@ func TestEmitWithCustomData(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := store.NewWithDB(db)
+	s := sqlite.NewWithDB(db)
 	defer s.Close()
 
 	b := live.New()
@@ -89,7 +89,7 @@ func TestHistoricalDataGeneration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := store.NewWithDB(db)
+	s := sqlite.NewWithDB(db)
 	defer s.Close()
 
 	generateHistoricalData(s)

@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func Handler(store *store.Store, live *live.Broadcaster) http.HandlerFunc {
+func Handler(store store.Storage, live *live.Broadcaster) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var e model.Event
 		if err := json.NewDecoder(r.Body).Decode(&e); err != nil {

@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/xonoxc/scopion/internal/store"
+	"github.com/xonoxc/scopion/internal/store/sqlite"
 )
 
 type Monitor struct {
@@ -112,11 +112,11 @@ func (rl *RateLimiter) Acquire() {
 
 type DatabaseStressTest struct {
 	config BenchmarkConfig
-	store  *store.Store
+	store  *sqlite.SqliteStore
 }
 
 func NewDatabaseStressTest(config BenchmarkConfig) (*DatabaseStressTest, error) {
-	s, err := store.New(config.DatabasePath)
+	s, err := sqlite.New(config.DatabasePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create store: %w", err)
 	}

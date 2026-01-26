@@ -62,13 +62,14 @@ func generateCustomData(service, name string) map[string]any {
 			data["status_code"] = 200
 		}
 	case "worker":
-		if name == "ProcessPayment" {
+		switch name {
+		case "ProcessPayment":
 			data["amount"] = float64(rand.Intn(10000)) / 100
 			data["currency"] = "USD"
 			data["payment_method"] = []string{"credit_card", "paypal", "bank_transfer"}[rand.Intn(3)]
 			data["transaction_id"] = fmt.Sprintf("txn_%s", randomID())
 			data["processing_time_ms"] = rand.Intn(5000) + 100
-		} else if name == "SendEmail" {
+		case "SendEmail":
 			data["recipient_count"] = rand.Intn(10) + 1
 			data["email_type"] = []string{"welcome", "notification", "marketing", "reset"}[rand.Intn(4)]
 			data["template_id"] = fmt.Sprintf("template_%d", rand.Intn(100))
@@ -110,7 +111,7 @@ func generateCustomData(service, name string) map[string]any {
 	return data
 }
 
-func Start(store *store.Store, live *live.Broadcaster) {
+func Start(store store.Storage, live *live.Broadcaster) {
 	generateHistoricalData(store)
 
 	go generateAPIRequests(store, live)
@@ -122,7 +123,7 @@ func Start(store *store.Store, live *live.Broadcaster) {
 	go generatePaymentEvents(store, live)
 }
 
-func generateHistoricalData(store *store.Store) {
+func generateHistoricalData(store store.Storage) {
 	now := time.Now()
 	for range 200 {
 		pastTime := now.Add(-time.Duration(rand.Intn(86400)) * time.Second)
@@ -145,7 +146,7 @@ func generateHistoricalData(store *store.Store) {
 	}
 }
 
-func generateAPIRequests(store *store.Store, live *live.Broadcaster) {
+func generateAPIRequests(store store.Storage, live *live.Broadcaster) {
 	apiEndpoints := []string{"GET /users", "POST /login", "GET /orders", "PUT /profile", "DELETE /session"}
 	for {
 		traceID := randomID()
@@ -164,7 +165,7 @@ func generateAPIRequests(store *store.Store, live *live.Broadcaster) {
 	}
 }
 
-func generateWorkerTasks(store *store.Store, live *live.Broadcaster) {
+func generateWorkerTasks(store store.Storage, live *live.Broadcaster) {
 	workerTasks := []string{"ProcessPayment", "SendEmail", "GenerateReport", "CleanupData"}
 	for {
 		traceID := randomID()
@@ -183,7 +184,7 @@ func generateWorkerTasks(store *store.Store, live *live.Broadcaster) {
 	}
 }
 
-func generateWebhookEvents(store *store.Store, live *live.Broadcaster) {
+func generateWebhookEvents(store store.Storage, live *live.Broadcaster) {
 	webhookEvents := []string{"POST /webhook/payment", "POST /webhook/order", "POST /webhook/user"}
 	for {
 		traceID := randomID()
@@ -200,7 +201,7 @@ func generateWebhookEvents(store *store.Store, live *live.Broadcaster) {
 	}
 }
 
-func generateCronJobs(store *store.Store, live *live.Broadcaster) {
+func generateCronJobs(store store.Storage, live *live.Broadcaster) {
 	cronJobs := []string{"CleanupSessions", "ArchiveOldData", "GenerateDailyReport", "SyncExternalData"}
 	for {
 		traceID := randomID()
@@ -217,7 +218,7 @@ func generateCronJobs(store *store.Store, live *live.Broadcaster) {
 	}
 }
 
-func generateSchedulerTasks(store *store.Store, live *live.Broadcaster) {
+func generateSchedulerTasks(store store.Storage, live *live.Broadcaster) {
 	schedulerTasks := []string{"ScheduleTask", "QueueJob", "ProcessQueue", "UpdateMetrics"}
 	for {
 		traceID := randomID()
@@ -234,7 +235,7 @@ func generateSchedulerTasks(store *store.Store, live *live.Broadcaster) {
 	}
 }
 
-func generateAuthEvents(store *store.Store, live *live.Broadcaster) {
+func generateAuthEvents(store store.Storage, live *live.Broadcaster) {
 	authEvents := []string{"ValidateToken", "RefreshToken", "PasswordReset", "UserLogin"}
 	for {
 		traceID := randomID()
@@ -251,7 +252,7 @@ func generateAuthEvents(store *store.Store, live *live.Broadcaster) {
 	}
 }
 
-func generatePaymentEvents(store *store.Store, live *live.Broadcaster) {
+func generatePaymentEvents(store store.Storage, live *live.Broadcaster) {
 	paymentEvents := []string{"ChargeCard", "RefundPayment", "ValidatePayment", "ProcessRefund"}
 	for {
 		traceID := randomID()
@@ -268,11 +269,11 @@ func generatePaymentEvents(store *store.Store, live *live.Broadcaster) {
 	}
 }
 
-func emit(store *store.Store, live *live.Broadcaster, service, name, traceID, level string) {
+func emit(store store.Storage, live *live.Broadcaster, service, name, traceID, level string) {
 	emitWithTime(store, live, service, name, traceID, level, time.Now())
 }
 
-func emitWithTime(store *store.Store, live *live.Broadcaster, service, name, traceID, level string, timestamp time.Time) {
+func emitWithTime(store store.Storage, live *live.Broadcaster, service, name, traceID, level string, timestamp time.Time) {
 	e := model.Event{
 		ID:        uuid.New().String(),
 		Timestamp: timestamp,

@@ -9,7 +9,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
 	"github.com/xonoxc/scopion/internal/live"
-	"github.com/xonoxc/scopion/internal/store"
+	"github.com/xonoxc/scopion/internal/store/sqlite"
 )
 
 func TestHandler(t *testing.T) {
@@ -26,7 +26,7 @@ func TestHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := store.NewWithDB(db)
+	s := sqlite.NewWithDB(db)
 	b := live.New()
 
 	handler := Handler(s, b)
@@ -64,7 +64,7 @@ func TestHandlerWithCustomData(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := store.NewWithDB(db)
+	s := sqlite.NewWithDB(db)
 	b := live.New()
 
 	handler := Handler(s, b)

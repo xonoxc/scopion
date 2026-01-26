@@ -1,4 +1,4 @@
-package store
+package sqlite
 
 import (
 	"database/sql"
@@ -8,13 +8,29 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/xonoxc/scopion/internal/model"
+	migrateable "github.com/xonoxc/scopion/internal/store/migratable"
 )
 
-type Store struct {
+type SqliteStore struct {
 	db *sql.DB
 }
 
-func New(dbPath string) (*Store, error) {
+/**
+* implementation for
+*  migratable interface
+**/
+func (s *SqliteStore) DB() *sql.DB {
+	return s.db
+}
+
+func (s *SqliteStore) Dialect() migrateable.DatabaseName {
+	return migrateable.SQLITE
+}
+
+/*
+* Implementation of Storage interface
+**/
+func New(dbPath string) (*SqliteStore, error) {
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
@@ -24,14 +40,14 @@ func New(dbPath string) (*Store, error) {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	return &Store{db: db}, nil
+	return &SqliteStore{db: db}, nil
 }
 
-func NewWithDB(db *sql.DB) *Store {
-	return &Store{db: db}
+func NewWithDB(db *sql.DB) *SqliteStore {
+	return &SqliteStore{db: db}
 }
 
-func (s *Store) Append(e model.Event) error {
+func (s *SqliteStore) Append(e model.Event) error {
 	var dataJSON []byte
 	var err error
 	if e.Data != nil {
@@ -39,6 +55,8 @@ func (s *Store) Append(e model.Event) error {
 		if err != nil {
 			return fmt.Errorf("failed to marshal event data: %w", err)
 		}
+	} else {
+		dataJSON = nil
 	}
 
 	_, err = s.db.Exec(
@@ -51,7 +69,7 @@ func (s *Store) Append(e model.Event) error {
 	return nil
 }
 
-func (s *Store) Recent(n int) ([]model.Event, error) {
+func (s *SqliteStore) Recent(n int) ([]model.Event, error) {
 	rows, err := s.db.Query(
 		"SELECT id, timestamp, level, service, name, trace_id, data FROM events ORDER BY timestamp DESC LIMIT ?",
 		n,
@@ -91,13 +109,7 @@ func (s *Store) Recent(n int) ([]model.Event, error) {
 	return events, nil
 }
 
-type Stats struct {
-	TotalEvents    int     `json:"total_events"`
-	ErrorRate      float64 `json:"error_rate"`
-	ActiveServices int     `json:"active_services"`
-}
-
-func (s *Store) GetStats() (*Stats, error) {
+func (s *SqliteStore) GetStats() (*model.Stats, error) {
 	var totalEvents int
 	err := s.db.QueryRow("SELECT COUNT(*) FROM events").Scan(&totalEvents)
 	if err != nil {
@@ -121,19 +133,14 @@ func (s *Store) GetStats() (*Stats, error) {
 		errorRate = float64(errorEvents) / float64(totalEvents) * 100
 	}
 
-	return &Stats{
+	return &model.Stats{
 		TotalEvents:    totalEvents,
 		ErrorRate:      errorRate,
 		ActiveServices: activeServices,
 	}, nil
 }
 
-type ErrorByService struct {
-	Service string `json:"service"`
-	Count   int    `json:"count"`
-}
-
-func (s *Store) GetErrorsByService(hours int) ([]ErrorByService, error) {
+func (s *SqliteStore) GetErrorsByService(hours int) ([]model.ErrorByService, error) {
 	query := `
 		SELECT service, COUNT(*) as count
 		FROM events
@@ -149,9 +156,9 @@ func (s *Store) GetErrorsByService(hours int) ([]ErrorByService, error) {
 	}
 	defer rows.Close()
 
-	var results []ErrorByService
+	var results []model.ErrorByService
 	for rows.Next() {
-		var e ErrorByService
+		var e model.ErrorByService
 		err := rows.Scan(&e.Service, &e.Count)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan error by service: %w", err)
@@ -162,14 +169,7 @@ func (s *Store) GetErrorsByService(hours int) ([]ErrorByService, error) {
 	return results, rows.Err()
 }
 
-type ServiceInfo struct {
-	Name         string    `json:"name"`
-	ErrorCount   int       `json:"error_count"`
-	LastActivity time.Time `json:"last_activity"`
-	EventCount   int       `json:"event_count"`
-}
-
-func (s *Store) GetServices() ([]ServiceInfo, error) {
+func (s *SqliteStore) GetServices() ([]model.ServiceInfo, error) {
 	query := `
 		SELECT
 			service,
@@ -187,9 +187,9 @@ func (s *Store) GetServices() ([]ServiceInfo, error) {
 	}
 	defer rows.Close()
 
-	var results []ServiceInfo
+	var results []model.ServiceInfo
 	for rows.Next() {
-		var s ServiceInfo
+		var s model.ServiceInfo
 		err := rows.Scan(&s.Name, &s.ErrorCount, &s.LastActivity, &s.EventCount)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan service info: %w", err)
@@ -200,17 +200,7 @@ func (s *Store) GetServices() ([]ServiceInfo, error) {
 	return results, rows.Err()
 }
 
-type TraceInfo struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Service   string    `json:"service"`
-	Duration  int       `json:"duration"` // Placeholder, will need actual trace data
-	Spans     int       `json:"spans"`    // Placeholder
-	Timestamp time.Time `json:"timestamp"`
-	HasError  bool      `json:"has_error"`
-}
-
-func (s *Store) GetTraces(limit int) ([]TraceInfo, error) {
+func (s *SqliteStore) GetTraces(limit int) ([]model.TraceInfo, error) {
 	// For now, group events by trace_id to simulate traces
 	query := `
 		SELECT
@@ -233,9 +223,9 @@ func (s *Store) GetTraces(limit int) ([]TraceInfo, error) {
 	}
 	defer rows.Close()
 
-	var results []TraceInfo
+	var results []model.TraceInfo
 	for rows.Next() {
-		var t TraceInfo
+		var t model.TraceInfo
 		var startTimeStr, endTimeStr string
 		var hasErrorInt int
 		var names string
@@ -266,7 +256,7 @@ func (s *Store) GetTraces(limit int) ([]TraceInfo, error) {
 	return results, rows.Err()
 }
 
-func (s *Store) SearchEvents(query string, limit int) ([]model.Event, error) {
+func (s *SqliteStore) SearchEvents(query string, limit int) ([]model.Event, error) {
 	// Search in name, service, and trace_id fields
 	searchQuery := `
 		SELECT id, timestamp, level, service, name, trace_id, data
@@ -305,7 +295,7 @@ func (s *Store) SearchEvents(query string, limit int) ([]model.Event, error) {
 	return events, rows.Err()
 }
 
-func (s *Store) GetEventsByTraceID(traceID string) ([]model.Event, error) {
+func (s *SqliteStore) GetEventsByTraceID(traceID string) ([]model.Event, error) {
 	query := `
 		SELECT id, timestamp, level, service, name, trace_id, data
 		FROM events
@@ -341,12 +331,7 @@ func (s *Store) GetEventsByTraceID(traceID string) ([]model.Event, error) {
 	return events, rows.Err()
 }
 
-type ThroughputData struct {
-	Time   string `json:"time"`
-	Events int    `json:"events"`
-}
-
-func (s *Store) GetThroughput(hours int) ([]ThroughputData, error) {
+func (s *SqliteStore) GetThroughput(hours int) ([]model.ThroughputData, error) {
 	if hours <= 0 {
 		hours = 24
 	}
@@ -373,9 +358,9 @@ func (s *Store) GetThroughput(hours int) ([]ThroughputData, error) {
 	}
 	defer rows.Close()
 
-	var results []ThroughputData
+	var results []model.ThroughputData
 	for rows.Next() {
-		var t ThroughputData
+		var t model.ThroughputData
 		err := rows.Scan(&t.Time, &t.Events)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan throughput data: %w", err)
@@ -386,6 +371,6 @@ func (s *Store) GetThroughput(hours int) ([]ThroughputData, error) {
 	return results, rows.Err()
 }
 
-func (s *Store) Close() error {
+func (s *SqliteStore) Close() error {
 	return s.db.Close()
 }

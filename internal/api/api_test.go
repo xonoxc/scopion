@@ -11,7 +11,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
 	"github.com/xonoxc/scopion/internal/model"
-	"github.com/xonoxc/scopion/internal/store"
+	"github.com/xonoxc/scopion/internal/store/sqlite"
 )
 
 func TestEventsHandler(t *testing.T) {
@@ -28,7 +28,7 @@ func TestEventsHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := store.NewWithDB(db)
+	s := sqlite.NewWithDB(db)
 
 	// Insert event
 	ts := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -73,7 +73,7 @@ func TestTraceEventsHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := store.NewWithDB(db)
+	s := sqlite.NewWithDB(db)
 
 	// Insert multiple events for the same trace
 	baseTime := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -142,7 +142,7 @@ func TestTraceEventsHandlerNoTraceID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := store.NewWithDB(db)
+	s := sqlite.NewWithDB(db)
 
 	handler := TraceEventsHandler(s)
 
@@ -170,7 +170,7 @@ func TestTraceEventsHandlerNotFound(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := store.NewWithDB(db)
+	s := sqlite.NewWithDB(db)
 
 	handler := TraceEventsHandler(s)
 

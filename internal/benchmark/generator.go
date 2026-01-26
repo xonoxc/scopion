@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/xonoxc/scopion/internal/model"
-	"github.com/xonoxc/scopion/internal/store"
+	"github.com/xonoxc/scopion/internal/store/sqlite"
 )
 
 type BenchmarkConfig struct {
@@ -50,7 +50,7 @@ type SystemStats struct {
 
 type LoadGenerator struct {
 	config     BenchmarkConfig
-	store      *store.Store
+	store      *sqlite.SqliteStore
 	results    *BenchmarkResult
 	stopChan   chan struct{}
 	wg         sync.WaitGroup
@@ -59,7 +59,7 @@ type LoadGenerator struct {
 }
 
 func NewLoadGenerator(config BenchmarkConfig) (*LoadGenerator, error) {
-	s, err := store.New(config.DatabasePath)
+	s, err := sqlite.New(config.DatabasePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create store: %w", err)
 	}

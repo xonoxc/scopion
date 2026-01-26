@@ -54,7 +54,7 @@ func TestIngestEventWithCustomData(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.URL)
-	customData := map[string]interface{}{
+	customData := map[string]any{
 		"user_id":    123,
 		"action":     "login",
 		"ip_address": "192.168.1.1",

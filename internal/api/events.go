@@ -5,8 +5,9 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/xonoxc/scopion/internal/api/httpx"
+	"github.com/xonoxc/scopion/internal/app/appcontext"
 	"github.com/xonoxc/scopion/internal/model"
-	"github.com/xonoxc/scopion/internal/store"
 )
 
 type ServerStatus struct {
@@ -14,12 +15,13 @@ type ServerStatus struct {
 	Version     string `json:"version"`
 }
 
-func StatsHandler(s *store.Store) http.HandlerFunc {
+func StatsHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		if !httpx.RequireMethod(w, r, http.MethodGet) {
 			return
 		}
+
+		s := as.Snapshot().Store
 
 		stats, err := s.GetStats()
 		if err != nil {
@@ -27,15 +29,13 @@ func StatsHandler(s *store.Store) http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(stats)
+		httpx.WriteJSON(w, http.StatusOK, stats)
 	}
 }
 
-func ErrorsByServiceHandler(s *store.Store) http.HandlerFunc {
+func ErrorsByServiceHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		if !httpx.RequireMethod(w, r, http.MethodGet) {
 			return
 		}
 
@@ -47,23 +47,25 @@ func ErrorsByServiceHandler(s *store.Store) http.HandlerFunc {
 			}
 		}
 
+		s := as.Snapshot().Store
+
 		errors, err := s.GetErrorsByService(hours)
 		if err != nil {
 			http.Error(w, "Failed to fetch errors by service", http.StatusInternalServerError)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(errors)
+		httpx.WriteJSON(w, http.StatusOK, errors)
 	}
 }
 
-func ServicesHandler(s *store.Store) http.HandlerFunc {
+func ServicesHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		if !httpx.RequireMethod(w, r, http.MethodGet) {
 			return
 		}
+
+		s := as.Snapshot().Store
 
 		services, err := s.GetServices()
 		if err != nil {
@@ -71,15 +73,13 @@ func ServicesHandler(s *store.Store) http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(services)
+		httpx.WriteJSON(w, http.StatusOK, services)
 	}
 }
 
-func TracesHandler(s *store.Store) http.HandlerFunc {
+func TracesHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		if !httpx.RequireMethod(w, r, http.MethodGet) {
 			return
 		}
 
@@ -91,21 +91,21 @@ func TracesHandler(s *store.Store) http.HandlerFunc {
 			}
 		}
 
+		s := as.Snapshot().Store
+
 		traces, err := s.GetTraces(limit)
 		if err != nil {
 			http.Error(w, "Failed to fetch traces", http.StatusInternalServerError)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(traces)
+		httpx.WriteJSON(w, http.StatusOK, traces)
 	}
 }
 
-func SearchHandler(s *store.Store) http.HandlerFunc {
+func SearchHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		if !httpx.RequireMethod(w, r, http.MethodGet) {
 			return
 		}
 
@@ -115,21 +115,21 @@ func SearchHandler(s *store.Store) http.HandlerFunc {
 			return
 		}
 
+		s := as.Snapshot().Store
+
 		events, err := s.SearchEvents(query, 50)
 		if err != nil {
 			http.Error(w, "Failed to search events", http.StatusInternalServerError)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(events)
+		httpx.WriteJSON(w, http.StatusOK, events)
 	}
 }
 
 func StatusHandler(demoEnabled bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		if !httpx.RequireMethod(w, r, http.MethodGet) {
 			return
 		}
 
@@ -138,15 +138,13 @@ func StatusHandler(demoEnabled bool) http.HandlerFunc {
 			Version:     "1.0.0",
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(status)
+		httpx.WriteJSON(w, http.StatusOK, status)
 	}
 }
 
-func ThroughputHandler(s *store.Store) http.HandlerFunc {
+func ThroughputHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		if !httpx.RequireMethod(w, r, http.MethodGet) {
 			return
 		}
 
@@ -158,21 +156,21 @@ func ThroughputHandler(s *store.Store) http.HandlerFunc {
 			}
 		}
 
+		s := as.Snapshot().Store
+
 		throughput, err := s.GetThroughput(hours)
 		if err != nil {
 			http.Error(w, "Failed to fetch throughput", http.StatusInternalServerError)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(throughput)
+		httpx.WriteJSON(w, http.StatusOK, throughput)
 	}
 }
 
-func EventsHandler(s *store.Store) http.HandlerFunc {
+func EventsHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		if !httpx.RequireMethod(w, r, http.MethodGet) {
 			return
 		}
 
@@ -184,21 +182,21 @@ func EventsHandler(s *store.Store) http.HandlerFunc {
 			}
 		}
 
+		s := as.Snapshot().Store
+
 		events, err := s.Recent(limit)
 		if err != nil {
 			http.Error(w, "Failed to fetch events", http.StatusInternalServerError)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(events)
+		httpx.WriteJSON(w, http.StatusOK, events)
 	}
 }
 
-func TraceEventsHandler(s *store.Store) http.HandlerFunc {
+func TraceEventsHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		if !httpx.RequireMethod(w, r, http.MethodGet) {
 			return
 		}
 
@@ -208,13 +206,14 @@ func TraceEventsHandler(s *store.Store) http.HandlerFunc {
 			return
 		}
 
+		s := as.Snapshot().Store
+
 		events, err := s.GetEventsByTraceID(traceID)
 		if err != nil {
 			http.Error(w, "Failed to fetch trace events", http.StatusInternalServerError)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(events)
+		httpx.WriteJSON(w, http.StatusOK, events)
 	}
 }

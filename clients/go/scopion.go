@@ -18,16 +18,16 @@ func NewClient(baseURL string) *Client {
 }
 
 type Event struct {
-	ID        string                 `json:"id"`
-	Timestamp string                 `json:"timestamp"`
-	Level     string                 `json:"level"`
-	Service   string                 `json:"service"`
-	Name      string                 `json:"name"`
-	TraceID   *string                `json:"trace_id,omitempty"`
-	Data      map[string]interface{} `json:"data,omitempty"`
+	ID        string         `json:"id"`
+	Timestamp string         `json:"timestamp"`
+	Level     string         `json:"level"`
+	Service   string         `json:"service"`
+	Name      string         `json:"name"`
+	TraceID   *string        `json:"trace_id,omitempty"`
+	Data      map[string]any `json:"data,omitempty"`
 }
 
-func (c *Client) IngestEvent(level, service, name string, traceID *string, customData map[string]interface{}) error {
+func (c *Client) IngestEvent(level, service, name string, traceID *string, customData map[string]any) error {
 	data := map[string]any{
 		"level":   level,
 		"service": service,
