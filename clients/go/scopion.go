@@ -33,21 +33,26 @@ func (c *Client) IngestEvent(level, service, name string, traceID *string, custo
 		"service": service,
 		"name":    name,
 	}
+
 	if traceID != nil {
 		data["trace_id"] = *traceID
 	}
+
 	if customData != nil {
 		data["data"] = customData
 	}
+
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return err
 	}
+
 	resp, err := http.Post(c.BaseURL+"/ingest", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != 202 {
 		return fmt.Errorf("unexpected status: %d", resp.StatusCode)
 	}

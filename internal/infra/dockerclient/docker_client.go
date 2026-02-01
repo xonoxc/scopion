@@ -2,6 +2,7 @@ package dockerclient
 
 import (
 	"context"
+	"fmt"
 
 	docker "github.com/fsouza/go-dockerclient"
 )
@@ -67,9 +68,13 @@ func (d *DockerService) RunContainer(ctx context.Context, spec ContainerSpec) (*
 		return nil, err
 	}
 
+	hostPort := spec.Ports["5432/tcp"]
+	dsn := fmt.Sprintf("host=127.0.0.1 port=%s user=postgres password=secret dbname=mydb sslmode=disable", hostPort)
+
 	return &ContainerResult{
-		ID:    container.ID,
-		Name:  spec.Name,
-		Ports: spec.Ports,
+		ID:         container.ID,
+		Name:       spec.Name,
+		Ports:      spec.Ports,
+		ConnectDSN: dsn,
 	}, nil
 }

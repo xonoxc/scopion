@@ -8,47 +8,23 @@ import (
 )
 
 type Migrator struct {
-	Dsn string
+	migrations []Migration
 }
 
-func New(connStr string) *Migrator {
+func NewMigrator(migrations []Migration) *Migrator {
 	return &Migrator{
-		Dsn: connStr,
+		migrations: migrations,
 	}
 }
 
-func (m *Migrator) Migrate(dialect migrateable.DatabaseName, migrations []Migration) error {
-	conn, err := connByDialect(dialect, m.Dsn)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
+func (m *Migrator) Migrate(conn *sql.DB, dialect migrateable.DatabaseName) error {
 	return withTransaction(conn, func(tx *sql.Tx) error {
-		return runMigrations(dialect, tx, migrations)
+		return m.runMigrations(dialect, tx)
 	})
 }
 
-func connByDialect(dialect migrateable.DatabaseName, dsn string) (*sql.DB, error) {
-	driver, err := driverFor(dialect)
-	if err != nil {
-		return nil, err
-	}
-
-	db, err := sql.Open(driver, dsn)
-	if err != nil {
-		return nil, fmt.Errorf("migration open err: %w", err)
-	}
-
-	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("migration ping err: %w", err)
-	}
-
-	return db, nil
-}
-
-func runMigrations(dialect migrateable.DatabaseName, tx *sql.Tx, migrations []Migration) error {
-	for _, migr := range migrations {
+func (m *Migrator) runMigrations(dialect migrateable.DatabaseName, tx *sql.Tx) error {
+	for _, migr := range m.migrations {
 		switch dialect {
 		case migrateable.POSTGRES:
 			if err := migr.UpPostgres(tx); err != nil {
@@ -60,6 +36,24 @@ func runMigrations(dialect migrateable.DatabaseName, tx *sql.Tx, migrations []Mi
 			}
 		}
 	}
+	return nil
+}
+
+func (m *Migrator) AquireMigrationLock(tx *sql.DB) error {
+	_, err := tx.Exec("SELECT pg_advisory_lock(424242)")
+	if err != nil {
+		return fmt.Errorf("failed to acquire migration lock: %w", err)
+	}
+
+	return nil
+}
+
+func (m *Migrator) ReleaseMigrationLock(tx *sql.DB) error {
+	_, err := tx.Exec("SELECT pg_advisory_unlock(424242)")
+	if err != nil {
+		return fmt.Errorf("failed to acquire migration lock: %w", err)
+	}
+
 	return nil
 }
 
@@ -75,11 +69,4 @@ func withTransaction(db *sql.DB, fn func(*sql.Tx) error) error {
 	}
 
 	return tx.Commit()
-}
-
-func driverFor(d migrateable.DatabaseName) (string, error) {
-	if !d.Valid() {
-		return "", fmt.Errorf("unsupported dialect: %s", d)
-	}
-	return string(d), nil
 }

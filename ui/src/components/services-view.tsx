@@ -4,31 +4,32 @@ import { cn } from "~/lib/utils"
 import { useServices } from "~/hooks/use-services"
 
 export function ServicesView() {
-    const { data: services, isLoading } = useServices()
+   const { data: services, isLoading } = useServices()
 
-    if (isLoading) {
-        return (
-            <div className="flex h-full items-center justify-center">
-                <p className="text-sm text-muted-foreground">Loading services...</p>
-            </div>
-        )
-    }
+   if (isLoading) {
+      return (
+         <div className="flex h-full items-center justify-center">
+            <p className="text-sm text-muted-foreground">Loading services...</p>
+         </div>
+      )
+   }
 
-    const formatTime = (dateStr: string) => {
-       const date = new Date(dateStr)
-       const now = new Date()
-       const diff = now.getTime() - date.getTime()
-       if (diff < 60000) return "active"
-       if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`
-       return `${Math.floor(diff / 3600000)}h ago`
-    }
+   const formatTime = (dateStr: string) => {
+      const date = new Date(dateStr)
+      const now = new Date()
+      const diff = now.getTime() - date.getTime()
+      if (diff < 60000) return "active"
+      if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`
+      return `${Math.floor(diff / 3600000)}h ago`
+   }
 
-    const servicesData = services?.map(s => ({
-        ...s,
-        status: s.error_count > 0 ? "errors" : "healthy" as "healthy" | "errors" | "idle",
-        eventsPerMinute: Math.round(s.event_count / 60), // Rough estimate
-        avgLatency: 50, // Placeholder
-        sparkline: [
+   const servicesData =
+      services?.map(s => ({
+         ...s,
+         status: s.error_count > 0 ? "errors" : ("healthy" as "healthy" | "errors" | "idle"),
+         eventsPerMinute: Math.round(s.event_count / 60),
+         avgLatency: 50,
+         sparkline: [
             { value: 10 },
             { value: 15 },
             { value: 12 },
@@ -36,25 +37,25 @@ export function ServicesView() {
             { value: 14 },
             { value: 16 },
             { value: 13 },
-        ], // Placeholder sparkline
-    })) || []
+         ],
+      })) || []
 
-    const healthyCount = servicesData.filter(s => s.status === "healthy").length
-    const errorCount = servicesData.filter(s => s.status === "errors").length
+   const healthyCount = servicesData.filter(s => s.status === "healthy").length
+   const errorCount = servicesData.filter(s => s.status === "errors").length
 
    return (
       <div className="h-full flex flex-col">
          {/* Header with summary */}
          <div className="flex items-center justify-between border-b border-border bg-card px-6 py-4">
-             <p className="text-xs text-muted-foreground">
-                {servicesData.length} services • {healthyCount} healthy • {errorCount} with errors
-             </p>
+            <p className="text-xs text-muted-foreground">
+               {servicesData.length} services • {healthyCount} healthy • {errorCount} with errors
+            </p>
          </div>
 
          {/* Services grid */}
          <div className="flex-1 overflow-auto p-6">
-             <div className="grid grid-cols-2 gap-4">
-                {servicesData.map(service => (
+            <div className="grid grid-cols-2 gap-4">
+               {servicesData.map(service => (
                   <div
                      key={service.name}
                      onClick={() => {}} // TODO: navigate to /live with service filter
@@ -117,29 +118,37 @@ export function ServicesView() {
                                        x2="0"
                                        y2="1"
                                     >
-                                        <stop
-                                           offset="0%"
-                                           stopColor={
-                                              service.status === "errors" ? "hsl(var(--destructive))" : "hsl(var(--success))"
-                                           }
-                                           stopOpacity={0.3}
-                                        />
-                                        <stop
-                                           offset="100%"
-                                           stopColor={
-                                              service.status === "errors" ? "hsl(var(--destructive))" : "hsl(var(--success))"
-                                           }
-                                           stopOpacity={0}
-                                        />
+                                       <stop
+                                          offset="0%"
+                                          stopColor={
+                                             service.status === "errors"
+                                                ? "hsl(var(--destructive))"
+                                                : "hsl(var(--success))"
+                                          }
+                                          stopOpacity={0.3}
+                                       />
+                                       <stop
+                                          offset="100%"
+                                          stopColor={
+                                             service.status === "errors"
+                                                ? "hsl(var(--destructive))"
+                                                : "hsl(var(--success))"
+                                          }
+                                          stopOpacity={0}
+                                       />
                                     </linearGradient>
                                  </defs>
-                                  <Area
-                                     type="monotone"
-                                     dataKey="value"
-                                     stroke={service.status === "errors" ? "hsl(var(--destructive))" : "hsl(var(--success))"}
-                                     strokeWidth={1.5}
-                                     fill={`url(#spark-${service.name})`}
-                                  />
+                                 <Area
+                                    type="monotone"
+                                    dataKey="value"
+                                    stroke={
+                                       service.status === "errors"
+                                          ? "hsl(var(--destructive))"
+                                          : "hsl(var(--success))"
+                                    }
+                                    strokeWidth={1.5}
+                                    fill={`url(#spark-${service.name})`}
+                                 />
                               </AreaChart>
                            </ResponsiveContainer>
                         </div>
@@ -176,21 +185,21 @@ export function ServicesView() {
                               <AlertCircle className="h-3.5 w-3.5" />
                               <span className="text-[10px] uppercase tracking-wide">Errors</span>
                            </div>
-                            <p
-                               className={cn(
-                                  "mt-1 font-mono text-lg font-semibold",
-                                  service.error_count > 0 ? "text-destructive" : "text-foreground"
-                               )}
-                            >
-                               {service.error_count}
-                            </p>
+                           <p
+                              className={cn(
+                                 "mt-1 font-mono text-lg font-semibold",
+                                 service.error_count > 0 ? "text-destructive" : "text-foreground"
+                              )}
+                           >
+                              {service.error_count}
+                           </p>
                         </div>
                      </div>
 
                      <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
-                         <span className="text-xs text-muted-foreground">
-                            {formatTime(service.last_activity)}
-                         </span>
+                        <span className="text-xs text-muted-foreground">
+                           {formatTime(service.last_activity)}
+                        </span>
                         <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1" />
                      </div>
                   </div>

@@ -10,9 +10,10 @@ type ContainerSpec struct {
 }
 
 type ContainerResult struct {
-	ID    string
-	Name  string
-	Ports map[string]string
+	ID         string
+	Name       string
+	Ports      map[string]string
+	ConnectDSN string
 }
 
 type Service interface {

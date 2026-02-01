@@ -12,7 +12,7 @@ import (
 )
 
 type PostgresStore struct {
-	db *sql.DB
+	Db *sql.DB
 }
 
 /**
@@ -20,7 +20,7 @@ type PostgresStore struct {
 *  migratable interface
 **/
 func (s *PostgresStore) DB() *sql.DB {
-	return s.db
+	return s.Db
 }
 
 func (s *PostgresStore) Dialect() migrateable.DatabaseName {
@@ -40,11 +40,11 @@ func New(connStr string) (*PostgresStore, error) {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	return &PostgresStore{db: db}, nil
+	return &PostgresStore{Db: db}, nil
 }
 
 func NewWithDB(db *sql.DB) *PostgresStore {
-	return &PostgresStore{db: db}
+	return &PostgresStore{Db: db}
 }
 
 func (p *PostgresStore) Append(e model.Event) error {
@@ -60,7 +60,7 @@ func (p *PostgresStore) Append(e model.Event) error {
 		data = nil
 	}
 
-	_, err := p.db.Exec(
+	_, err := p.Db.Exec(
 		`
 		INSERT INTO events
 		(id , timestamp , level , service , name, trace_id , data)
@@ -78,7 +78,7 @@ func (p *PostgresStore) Append(e model.Event) error {
 func (p *PostgresStore) GetStats() (*model.Stats, error) {
 	var stats model.Stats
 
-	err := p.db.QueryRow(
+	err := p.Db.QueryRow(
 		`
 		SELECT
 			COUNT(*) AS total_events,
@@ -99,7 +99,7 @@ func (p *PostgresStore) GetStats() (*model.Stats, error) {
 }
 
 func (p *PostgresStore) GetServices() ([]model.ServiceInfo, error) {
-	rows, err := p.db.Query(
+	rows, err := p.Db.Query(
 		`
 		SELECT
 			service,
@@ -144,7 +144,7 @@ func (p *PostgresStore) GetTraces(limit int) ([]model.TraceInfo, error) {
 		LIMIT $1
 	`
 
-	rows, err := p.db.Query(query, limit)
+	rows, err := p.Db.Query(query, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query traces: %w", err)
 	}
@@ -177,7 +177,7 @@ func (p *PostgresStore) GetTraces(limit int) ([]model.TraceInfo, error) {
 }
 
 func (p *PostgresStore) Recent(n int) ([]model.Event, error) {
-	rows, err := p.db.Query(
+	rows, err := p.Db.Query(
 		`
 		SELECT id, timestamp, level, service, name, trace_id, data
 		FROM events
@@ -223,7 +223,7 @@ func (p *PostgresStore) Recent(n int) ([]model.Event, error) {
 }
 
 func (p *PostgresStore) GetErrorsByService(hours int) ([]model.ErrorByService, error) {
-	rows, err := p.db.Query(
+	rows, err := p.Db.Query(
 		`
 		SELECT service, COUNT(*) AS count
 		FROM events
@@ -254,7 +254,7 @@ func (p *PostgresStore) GetErrorsByService(hours int) ([]model.ErrorByService, e
 func (p *PostgresStore) SearchEvents(query string, limit int) ([]model.Event, error) {
 	like := "%" + query + "%"
 
-	rows, err := p.db.Query(
+	rows, err := p.Db.Query(
 		`
 		SELECT id, timestamp, level, service, name, trace_id, data
 		FROM events
@@ -300,7 +300,7 @@ func (p *PostgresStore) SearchEvents(query string, limit int) ([]model.Event, er
 }
 
 func (p *PostgresStore) GetEventsByTraceID(traceID string) ([]model.Event, error) {
-	rows, err := p.db.Query(
+	rows, err := p.Db.Query(
 		`
 		SELECT id, timestamp, level, service, name, trace_id, data
 		FROM events
@@ -346,7 +346,7 @@ func (p *PostgresStore) GetThroughput(hours int) ([]model.ThroughputData, error)
 		hours = 24
 	}
 
-	rows, err := p.db.Query(
+	rows, err := p.Db.Query(
 		`
 		SELECT
 			date_trunc('hour', timestamp) AS time,
@@ -380,5 +380,5 @@ func (p *PostgresStore) GetThroughput(hours int) ([]model.ThroughputData, error)
 }
 
 func (s *PostgresStore) Close() error {
-	return s.db.Close()
+	return s.Db.Close()
 }

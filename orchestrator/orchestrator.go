@@ -5,11 +5,10 @@ import (
 
 	"github.com/xonoxc/scopion/internal/app/appcontext"
 	"github.com/xonoxc/scopion/internal/store"
+	"github.com/xonoxc/scopion/internal/store/dbprovisioner"
 	"github.com/xonoxc/scopion/internal/store/dualwrite"
 	"github.com/xonoxc/scopion/internal/store/migrations"
 	"github.com/xonoxc/scopion/internal/store/postgres"
-
-	migrateable "github.com/xonoxc/scopion/internal/store/migratable"
 )
 
 /*
@@ -18,18 +17,16 @@ import (
 * and handling the switching process
 **/
 type Orchestrator struct {
-	app      *appcontext.AtomicAppState
-	migrator *migrations.Migrator
+	app *appcontext.AtomicAppState
 }
 
-func New(appState *appcontext.AtomicAppState, migrator *migrations.Migrator) *Orchestrator {
+func New(appState *appcontext.AtomicAppState) *Orchestrator {
 	return &Orchestrator{
-		migrator: migrator,
-		app:      appState,
+		app: appState,
 	}
 }
 
-func (o *Orchestrator) MigrateTo(targetState store.StorageState) error {
+func (o *Orchestrator) MigrateTo(targetState store.StorageState, secondaryDSN string) error {
 	currentState := o.app.Snapshot()
 
 	storageState := currentState.StorageState
@@ -43,7 +40,7 @@ func (o *Orchestrator) MigrateTo(targetState store.StorageState) error {
 		if targetState != store.DUAL_WRITE {
 			return fmt.Errorf("illegal transition: %s → %s", storageState, targetState)
 		}
-		return o.switchToDualWrite()
+		return o.switchToDualWrite(secondaryDSN)
 
 	case store.DUAL_WRITE:
 		if targetState != store.SINGLE_SECONDARY {
@@ -57,20 +54,19 @@ func (o *Orchestrator) MigrateTo(targetState store.StorageState) error {
 	}
 }
 
-func (o *Orchestrator) switchToDualWrite() error {
+func (o *Orchestrator) switchToDualWrite(dsn string) error {
 	snap := o.app.Snapshot()
-	primary := snap.Store
+	primaryStore := snap.Store
 
-	secondaryStore, err := postgres.New(o.migrator.Dsn)
+	migrator := migrations.NewMigrator(migrations.GetAll())
+	dbProvisioner := dbprovisioner.New(migrator)
+
+	dbConn, err := dbProvisioner.Provision("postgres", dsn)
 	if err != nil {
 		return err
 	}
 
-	if err := o.migrator.Migrate(migrateable.POSTGRES, migrations.GetAll()); err != nil {
-		return err
-	}
-
-	dw := dualwrite.New(primary, secondaryStore)
+	dw := dualwrite.New(primaryStore, postgres.NewWithDB(dbConn))
 	o.app.Set(dw, store.DUAL_WRITE)
 
 	return nil

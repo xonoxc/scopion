@@ -7,6 +7,9 @@ import (
 
 	"github.com/xonoxc/scopion/internal/api/httpx"
 	"github.com/xonoxc/scopion/internal/app/appcontext"
+	"github.com/xonoxc/scopion/internal/store"
+	"github.com/xonoxc/scopion/orchestrator"
+
 	migrateable "github.com/xonoxc/scopion/internal/store/migratable"
 )
 
@@ -26,7 +29,6 @@ func SwitchDBHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-
 		defer r.Body.Close()
 
 		reqBody := SwitchDBRequest{}
@@ -34,11 +36,31 @@ func SwitchDBHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 			return
 		}
 
-		_, err := ParseDialect(reqBody.Dialect)
+		dialect, err := ParseDialect(reqBody.Dialect)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+
+		if dialect != migrateable.POSTGRES {
+			http.Error(w, "only postgres is supported for db switching", http.StatusBadRequest)
+			return
+		}
+
+		orches := orchestrator.New(as)
+
+		err = orches.MigrateTo(store.DUAL_WRITE, reqBody.DSN)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		resp := SwitchDBResponse{
+			Status:  "ok",
+			Message: "system switched to dual-write mode",
+		}
+
+		httpx.WriteJSON(w, http.StatusOK, resp)
 	}
 }
 
