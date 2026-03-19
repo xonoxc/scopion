@@ -26,7 +26,7 @@ echo ""
 echo "Scopion Dashboard:"
 scopion_count=$(ps aux | grep './bin/scopion' | grep -v grep | wc -l)
 if [ "$scopion_count" -eq 0 ]; then
-    echo "❌ No scopion dashboard running"
+    echo "No scopion dashboard running"
 elif [ "$scopion_count" -eq 1 ]; then
     echo "1 scopion dashboard running"
 else

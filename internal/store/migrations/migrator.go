@@ -7,6 +7,7 @@ import (
 	migrateable "github.com/xonoxc/scopion/internal/store/migratable"
 )
 
+
 type Migrator struct {
 	migrations []Migration
 }

@@ -8,4 +8,3 @@ export const Route = createFileRoute("/services")({
 function Services() {
    return <ServicesView />
 }
-

@@ -8,4 +8,3 @@ export const Route = createFileRoute("/errors")({
 function Errors() {
    return <ErrorsView serviceFilter={null} />
 }
-

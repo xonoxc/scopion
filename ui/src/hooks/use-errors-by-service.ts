@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 
-interface ErrorByService {
+export interface ErrorByService {
    service: string
    count: number
 }
@@ -31,7 +31,6 @@ export function useErrorsByService(hours: number = 24) {
             }
             return response.json()
          } catch {
-            // Return mock data if fetch fails
             return mockErrorsByService
          }
       },

@@ -16,38 +16,33 @@ export function LiveFeed({ serviceFilter }: LiveFeedProps) {
       serviceFilter,
    })
 
-   if (isLoading && filteredEvents.length === 0) {
-      return <LiveFeedLoadingState />
-   }
+   if (isLoading && !filteredEvents.length) <LiveFeedLoadingState />
 
-   switch (true) {
-      case filteredEvents.length === 0:
-         return <LiveFeedEmptyState />
-      default:
-         return (
-            <div className="h-full flex flex-col">
-               <div className="flex items-center justify-between border-b border-border bg-card px-6 py-4">
-                  <div>
-                     <p className="text-xs text-muted-foreground">
-                        Real-time event stream {serviceFilter && `• filtered by ${serviceFilter}`}
-                     </p>
-                  </div>
-                  <PauseButton paused={[isPaused, setIsPaused]} />
-               </div>
+   if (filteredEvents.length === 0) return <LiveFeedEmptyState />
 
-               {/* Table header */}
-               <LiveFeedTableHeader />
-
-               {/* Events list */}
-               <LiveFeedEventRow
-                  filteredEvents={filteredEvents}
-                  navigate={navigate}
-                  copiedId={copiedId}
-                  copyTraceId={copyTraceId}
-               />
+   return (
+      <div className="h-full flex flex-col">
+         <div className="flex items-center justify-between border-b border-border bg-card px-6 py-4">
+            <div>
+               <p className="text-xs text-muted-foreground">
+                  Real-time event stream {serviceFilter && `• filtered by ${serviceFilter}`}
+               </p>
             </div>
-         )
-   }
+            <PauseButton paused={[isPaused, setIsPaused]} />
+         </div>
+
+         {/* Table header */}
+         <LiveFeedTableHeader />
+
+         {/* Events list */}
+         <LiveFeedEventRow
+            filteredEvents={filteredEvents}
+            navigate={navigate}
+            copiedId={copiedId}
+            copyTraceId={copyTraceId}
+         />
+      </div>
+   )
 }
 
 function LiveFeedLoadingState() {

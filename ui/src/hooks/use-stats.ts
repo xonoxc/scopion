@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 
-interface Stats {
+export interface Stats {
    total_events: number
    error_rate: number
    active_services: number
@@ -23,7 +23,6 @@ export function useStats() {
             }
             return response.json()
          } catch {
-            // Return mock data if fetch fails
             return mockStats
          }
       },

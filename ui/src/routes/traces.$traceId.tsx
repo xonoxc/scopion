@@ -1,57 +1,57 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { TraceTimeline } from "~/components/trace-timeline"
-import { useQuery } from "@tanstack/react-query"
-
-interface TraceEvent {
-   id: string
-   timestamp: string
-   level: string
-   service: string
-   name: string
-   trace_id?: string
-   data?: Record<string, unknown>
-}
+import { useTraceEvents } from "~/hooks/use-events"
 
 export const Route = createFileRoute("/traces/$traceId")({
    component: Trace,
 })
 
+function getTraceMeta(
+   traceId: string,
+   firstEvent: { name?: string | null; service?: string | null }
+) {
+   return {
+      id: traceId,
+      name: firstEvent.name ?? `Trace ${traceId}`,
+      service: firstEvent.service ?? "unknown",
+   }
+}
+
 function Trace() {
    const { traceId } = Route.useParams()
    const navigate = useNavigate()
+   const { data: events, isLoading } = useTraceEvents(traceId)
 
-   const { data: events, isLoading } = useQuery({
-      queryKey: ["trace-events", traceId],
-      queryFn: async (): Promise<TraceEvent[]> => {
-         const response = await fetch(`/api/trace-events?trace_id=${traceId}`)
-         if (!response.ok) {
-            throw new Error("Failed to fetch trace events")
+   if (isLoading) return <LoadingState />
+   if (!events?.length) return <EmptyState />
+
+   const trace = getTraceMeta(traceId, events[0])
+
+   return (
+      <TraceTimeline
+         trace={trace}
+         events={events}
+         onClose={() =>
+            navigate({
+               to: "/traces",
+            })
          }
-         return response.json()
-      },
-   })
+      />
+   )
+}
 
-   if (isLoading) {
-      return (
-         <div className="flex h-full items-center justify-center">
-            <p className="text-sm text-muted-foreground">Loading trace...</p>
-         </div>
-      )
-   }
+function EmptyState() {
+   return (
+      <div className="flex h-full items-center justify-center">
+         <p className="text-sm text-muted-foreground">Trace not found</p>
+      </div>
+   )
+}
 
-   if (!events || events.length === 0) {
-      return (
-         <div className="flex h-full items-center justify-center">
-            <p className="text-sm text-muted-foreground">Trace not found</p>
-         </div>
-      )
-   }
-
-   const trace = {
-      id: traceId,
-      name: events[0]?.name || `Trace ${traceId}`,
-      service: events[0]?.service || "unknown",
-   }
-
-   return <TraceTimeline trace={trace} events={events} onClose={() => navigate({ to: "/traces" })} />
+function LoadingState() {
+   return (
+      <div className="flex h-full items-center justify-center">
+         <p className="text-sm text-muted-foreground">Loading trace...</p>
+      </div>
+   )
 }

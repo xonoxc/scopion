@@ -24,4 +24,3 @@ export function useSearch(query: string, enabled: boolean = false) {
       enabled: enabled && query.trim().length > 0,
    })
 }
-
