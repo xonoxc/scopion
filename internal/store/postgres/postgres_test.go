@@ -200,6 +200,92 @@ func TestPostgresGetTraceSpansEmpty(t *testing.T) {
 	}
 }
 
+func TestPostgresAppendWithData(t *testing.T) {
+	t.Parallel()
+	s := setupTestDB(t)
+
+	data := map[string]any{"key": "value", "count": float64(42)}
+	event := model.Event{
+		ID:        "event-with-data",
+		Timestamp: time.Now(),
+		Level:     "INFO",
+		Service:   "test-svc",
+		Name:      "test-event",
+		Data:      data,
+	}
+
+	if err := s.Append(event); err != nil {
+		t.Fatal(err)
+	}
+
+	events, err := s.SearchEvents("", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var found *model.Event
+	for i, e := range events {
+		if e.ID == "event-with-data" {
+			found = &events[i]
+			break
+		}
+	}
+
+	if found == nil {
+		t.Fatal("appended event not found in search results")
+	}
+
+	if found.Data == nil {
+		t.Fatal("expected event Data to be non-nil, got nil")
+	}
+
+	if found.Data["key"] != "value" {
+		t.Errorf("expected Data[key] = value, got %v", found.Data["key"])
+	}
+	if found.Data["count"] != float64(42) {
+		t.Errorf("expected Data[count] = 42, got %v", found.Data["count"])
+	}
+}
+
+func TestPostgresAppendWithNilData(t *testing.T) {
+	t.Parallel()
+	s := setupTestDB(t)
+
+	event := model.Event{
+		ID:        "event-nil-data",
+		Timestamp: time.Now(),
+		Level:     "INFO",
+		Service:   "test-svc",
+		Name:      "test-event",
+		Data:      nil,
+	}
+
+	if err := s.Append(event); err != nil {
+		t.Fatal(err)
+	}
+
+	events, err := s.SearchEvents("", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var found *model.Event
+	for i, e := range events {
+		if e.ID == "event-nil-data" {
+			found = &events[i]
+			break
+		}
+	}
+
+	if found == nil {
+		t.Fatal("appended event not found in search results")
+	}
+
+	if found.Data != nil {
+		t.Errorf("expected event Data to be nil, got %v", found.Data)
+	}
+}
+
 func TestPostgresGetTracesFromSpans(t *testing.T) {
 	t.Parallel()
 	s := setupTestDB(t)

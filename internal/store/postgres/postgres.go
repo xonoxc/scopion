@@ -51,7 +51,7 @@ func NewWithDB(db *sql.DB) *PostgresStore {
 func (p *PostgresStore) Append(e model.Event) error {
 	var data any
 
-	if e.Data == nil {
+	if e.Data != nil {
 		jsonData, err := json.Marshal(e.Data)
 		if err != nil {
 			return fmt.Errorf("marshal event data: %w", err)
