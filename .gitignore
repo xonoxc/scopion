@@ -51,5 +51,7 @@ Thumbs.db
 *.test
 *.out
 
+# Plans (local development)
+PLANS.md
 
 .opencode
