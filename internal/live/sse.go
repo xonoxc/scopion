@@ -3,6 +3,7 @@ package live
 import (
 	"encoding/json"
 	"net/http"
+	"sync"
 )
 
 func SSE(b *Broadcaster) http.HandlerFunc {
@@ -21,12 +22,41 @@ func SSE(b *Broadcaster) http.HandlerFunc {
 			return
 		}
 
-		for msg := range ch {
-			data, _ := json.Marshal(msg)
-			w.Write([]byte("data: "))
-			w.Write(data)
-			w.Write([]byte("\n\n"))
+		ctx := r.Context()
+		var mu sync.Mutex
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-ch:
+				if !ok {
+					return
+				}
+			mu.Lock()
+			data, err := json.Marshal(msg)
+			if err != nil {
+				mu.Unlock()
+				return
+			}
+			_, err = w.Write([]byte("data: "))
+			if err != nil {
+				mu.Unlock()
+				return
+			}
+			_, err = w.Write(data)
+			if err != nil {
+				mu.Unlock()
+				return
+			}
+			_, err = w.Write([]byte("\n\n"))
+			if err != nil {
+				mu.Unlock()
+				return
+			}
+			mu.Unlock()
 			flusher.Flush()
+			}
 		}
 	}
 }

@@ -1,6 +1,7 @@
 package live
 
 import (
+	"runtime"
 	"testing"
 	"time"
 
@@ -100,5 +101,26 @@ func TestPublishEvent(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("Timed out waiting for event message")
+	}
+}
+
+func TestNoGoroutineLeaks(t *testing.T) {
+	initialGoroutines := runtime.NumGoroutine()
+
+	for i := 0; i < 5; i++ {
+		b := New()
+		ch := make(chan Message, 1)
+		b.Subscribe(ch)
+		b.Publish(model.Event{ID: "test"})
+		<-ch
+		b.Unsubscribe(ch)
+		b.Stop()
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	finalGoroutines := runtime.NumGoroutine()
+	if finalGoroutines > initialGoroutines+2 {
+		t.Errorf("Possible goroutine leak: started with %d, ended with %d", initialGoroutines, finalGoroutines)
 	}
 }

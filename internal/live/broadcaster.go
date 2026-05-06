@@ -11,37 +11,52 @@ type Message struct {
 	Data any
 }
 
+type subscriber struct {
+	ch   chan Message
+	done chan struct{}
+}
+
 type Broadcaster struct {
-	register    chan chan Message
+	register    chan subscriber
 	unregister  chan chan Message
 	publish     chan model.Event
 	publishSpan chan model.Span
-	subscribers map[chan Message]struct{}
+	subscribers map[chan Message]subscriber
 	mu          sync.RWMutex
+	wg          sync.WaitGroup
+	stopped     chan struct{}
 }
 
 func New() *Broadcaster {
 	b := &Broadcaster{
-		register:    make(chan chan Message),
+		register:    make(chan subscriber),
 		unregister:  make(chan chan Message),
 		publish:     make(chan model.Event, 1024),
 		publishSpan: make(chan model.Span, 1024),
-		subscribers: make(map[chan Message]struct{}),
+		subscribers: make(map[chan Message]subscriber),
+		stopped:     make(chan struct{}),
 	}
+	b.wg.Add(1)
 	go b.run()
 	return b
 }
 
 func (b *Broadcaster) run() {
+	defer b.wg.Done()
 	for {
 		select {
-		case c := <-b.register:
+		case <-b.stopped:
+			return
+		case s := <-b.register:
 			b.mu.Lock()
-			b.subscribers[c] = struct{}{}
+			b.subscribers[s.ch] = s
 			b.mu.Unlock()
 		case c := <-b.unregister:
 			b.mu.Lock()
-			delete(b.subscribers, c)
+			if s, ok := b.subscribers[c]; ok {
+				close(s.done)
+				delete(b.subscribers, c)
+			}
 			b.mu.Unlock()
 			close(c)
 		case e := <-b.publish:
@@ -57,16 +72,21 @@ func (b *Broadcaster) run() {
 func (b *Broadcaster) broadcast(msg Message) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	for c := range b.subscribers {
+	for c, s := range b.subscribers {
 		select {
 		case c <- msg:
+		case <-s.done:
+			go func(ch chan Message) {
+				b.unregister <- ch
+			}(c)
 		default:
 		}
 	}
 }
 
 func (b *Broadcaster) Subscribe(ch chan Message) {
-	b.register <- ch
+	s := subscriber{ch: ch, done: make(chan struct{})}
+	b.register <- s
 }
 
 func (b *Broadcaster) Unsubscribe(ch chan Message) {
@@ -74,14 +94,20 @@ func (b *Broadcaster) Unsubscribe(ch chan Message) {
 }
 
 func (b *Broadcaster) Publish(e model.Event) {
-	b.publish <- e
+	select {
+	case b.publish <- e:
+	case <-b.stopped:
+	}
 }
 
 func (b *Broadcaster) PublishSpan(span model.Span) {
-	b.publishSpan <- span
+	select {
+	case b.publishSpan <- span:
+	case <-b.stopped:
+	}
 }
 
 func (b *Broadcaster) Stop() {
-	close(b.publish)
-	close(b.publishSpan)
+	close(b.stopped)
+	b.wg.Wait()
 }
