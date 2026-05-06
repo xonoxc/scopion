@@ -7,6 +7,7 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/google/uuid"
 	"github.com/xonoxc/scopion/internal/model"
 	migrateable "github.com/xonoxc/scopion/internal/store/migratable"
 )
@@ -128,16 +129,62 @@ func (p *PostgresStore) GetServices() ([]model.ServiceInfo, error) {
 	return results, rows.Err()
 }
 
+func (p *PostgresStore) AppendSpan(span model.Span) error {
+	spanID := uuid.NewString()
+	_, err := p.Db.Exec(
+		`
+		INSERT INTO spans (trace_id, span_id, parent_span_id, name, service, start_time, end_time, status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		`,
+		span.TraceID, spanID, span.ParentSpanID, span.Name, span.Service, span.StartTime, span.EndTime, span.Status,
+	)
+	if err != nil {
+		return fmt.Errorf("insert span: %w", err)
+	}
+	return nil
+}
+
+func (p *PostgresStore) GetTraceSpans(traceID string) ([]model.Span, error) {
+	rows, err := p.Db.Query(
+		`
+		SELECT trace_id, span_id, parent_span_id, name, service, start_time, end_time, status
+		FROM spans
+		WHERE trace_id = $1
+		ORDER BY start_time ASC
+		`,
+		traceID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query spans: %w", err)
+	}
+	defer rows.Close()
+
+	var spans []model.Span
+	for rows.Next() {
+		var sp model.Span
+		var parentSpanID sql.NullString
+		if err := rows.Scan(&sp.TraceID, &sp.SpanID, &parentSpanID, &sp.Name, &sp.Service, &sp.StartTime, &sp.EndTime, &sp.Status); err != nil {
+			return nil, fmt.Errorf("failed to scan span: %w", err)
+		}
+		if parentSpanID.Valid {
+			ps := parentSpanID.String
+			sp.ParentSpanID = &ps
+		}
+		spans = append(spans, sp)
+	}
+
+	return spans, rows.Err()
+}
+
 func (p *PostgresStore) GetTraces(limit int) ([]model.TraceInfo, error) {
 	query := `
 		SELECT
 			trace_id,
-			string_agg(name, ', ') AS names,
+			MIN(start_time) AS start_time,
+			MAX(end_time) AS end_time,
 			COUNT(*) AS span_count,
-			MIN(timestamp) AS start_time,
-			MAX(timestamp) AS end_time,
-			BOOL_OR(level = 'error') AS has_error
-		FROM events
+			BOOL_OR(status = 'ERROR') AS has_error
+		FROM spans
 		GROUP BY trace_id
 		ORDER BY start_time DESC
 		LIMIT $1
@@ -153,15 +200,13 @@ func (p *PostgresStore) GetTraces(limit int) ([]model.TraceInfo, error) {
 
 	for rows.Next() {
 		var t model.TraceInfo
-		var names string
 		var startTime, endTime time.Time
 
-		err := rows.Scan(&t.ID, &names, &t.Spans, &startTime, &endTime, &t.HasError)
+		err := rows.Scan(&t.ID, &startTime, &endTime, &t.Spans, &t.HasError)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan trace info: %w", err)
 		}
 
-		t.Name = names
 		t.Timestamp = startTime
 		t.Duration = int(endTime.Sub(startTime).Milliseconds())
 

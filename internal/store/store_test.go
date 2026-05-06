@@ -7,29 +7,32 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/pressly/goose/v3"
 	"github.com/xonoxc/scopion/internal/model"
+	"github.com/xonoxc/scopion/internal/store/migrations"
+	migrateable "github.com/xonoxc/scopion/internal/store/migratable"
 	"github.com/xonoxc/scopion/internal/store/sqlite"
 )
 
-func TestAppend(t *testing.T) {
+func setupStoreTest(t *testing.T) *sqlite.SqliteStore {
+	t.Helper()
 	db, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 
-	if err := goose.SetDialect("sqlite3"); err != nil {
+	migrator := migrations.NewMigrator(migrations.GetAll())
+	if err := migrator.Migrate(db, migrateable.SQLITE); err != nil {
 		t.Fatal(err)
 	}
-	if err := goose.Up(db, "./migrations"); err != nil {
-		t.Fatal(err)
-	}
 
-	s := sqlite.NewWithDB(db)
-	defer s.Close()
+	return sqlite.NewWithDB(db)
+}
 
-	err = s.Append(model.Event{
+func TestAppend(t *testing.T) {
+	s := setupStoreTest(t)
+
+	err := s.Append(model.Event{
 		ID:        "test",
 		Timestamp: time.Now(),
 		Service:   "test",
@@ -51,21 +54,7 @@ func TestAppend(t *testing.T) {
 }
 
 func TestSearchEvents(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	if err := goose.SetDialect("sqlite3"); err != nil {
-		t.Fatal(err)
-	}
-	if err := goose.Up(db, "./migrations"); err != nil {
-		t.Fatal(err)
-	}
-
-	s := sqlite.NewWithDB(db)
-	defer s.Close()
+	s := setupStoreTest(t)
 
 	baseTime := time.Now()
 
@@ -100,8 +89,7 @@ func TestSearchEvents(t *testing.T) {
 	}
 
 	for _, event := range events {
-		err = s.Append(event)
-		if err != nil {
+		if err := s.Append(event); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -138,21 +126,7 @@ func TestSearchEvents(t *testing.T) {
 }
 
 func TestAppendWithCustomData(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	if err := goose.SetDialect("sqlite3"); err != nil {
-		t.Fatal(err)
-	}
-	if err := goose.Up(db, "./migrations"); err != nil {
-		t.Fatal(err)
-	}
-
-	s := sqlite.NewWithDB(db)
-	defer s.Close()
+	s := setupStoreTest(t)
 
 	customData := map[string]any{
 		"user_id":    123,
@@ -164,7 +138,7 @@ func TestAppendWithCustomData(t *testing.T) {
 		},
 	}
 
-	err = s.Append(model.Event{
+	err := s.Append(model.Event{
 		ID:        "test-custom",
 		Timestamp: time.Now(),
 		Service:   "auth",
@@ -208,21 +182,7 @@ func TestAppendWithCustomData(t *testing.T) {
 }
 
 func TestGetEventsByTraceID(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	if err := goose.SetDialect("sqlite3"); err != nil {
-		t.Fatal(err)
-	}
-	if err := goose.Up(db, "./migrations"); err != nil {
-		t.Fatal(err)
-	}
-
-	s := sqlite.NewWithDB(db)
-	defer s.Close()
+	s := setupStoreTest(t)
 
 	traceID := "trace123"
 	baseTime := time.Now()
@@ -241,21 +201,19 @@ func TestGetEventsByTraceID(t *testing.T) {
 				"value": i * 10,
 			},
 		}
-		err = s.Append(event)
-		if err != nil {
+		if err := s.Append(event); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	err = s.Append(model.Event{
+	if err := s.Append(model.Event{
 		ID:        "other-event",
 		Timestamp: baseTime,
 		Service:   "test",
 		Name:      "other-operation",
 		TraceID:   "other-trace",
 		Level:     "info",
-	})
-	if err != nil {
+	}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -278,54 +236,39 @@ func TestGetEventsByTraceID(t *testing.T) {
 }
 
 func TestGetTraces(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	if err := goose.SetDialect("sqlite3"); err != nil {
-		t.Fatal(err)
-	}
-	if err := goose.Up(db, "./migrations"); err != nil {
-		t.Fatal(err)
-	}
-
-	s := sqlite.NewWithDB(db)
-	defer s.Close()
+	s := setupStoreTest(t)
 
 	baseTime := time.Now()
 
-	events := []model.Event{
+	spans := []model.Span{
 		{
-			ID:        "event1",
-			Timestamp: baseTime,
-			Service:   "api",
+			TraceID:   "trace1",
 			Name:      "GET /users",
-			TraceID:   "trace1",
-			Level:     "info",
-		},
-		{
-			ID:        "event2",
-			Timestamp: baseTime.Add(100 * time.Millisecond),
 			Service:   "api",
-			Name:      "db query",
-			TraceID:   "trace1",
-			Level:     "info",
+			StartTime: baseTime,
+			EndTime:   baseTime.Add(100 * time.Millisecond),
+			Status:    "OK",
 		},
 		{
-			ID:        "event3",
-			Timestamp: baseTime.Add(200 * time.Millisecond),
-			Service:   "worker",
-			Name:      "ProcessPayment",
+			TraceID:   "trace1",
+			Name:      "db query",
+			Service:   "api",
+			StartTime: baseTime.Add(50 * time.Millisecond),
+			EndTime:   baseTime.Add(100 * time.Millisecond),
+			Status:    "OK",
+		},
+		{
 			TraceID:   "trace2",
-			Level:     "error",
+			Name:      "ProcessPayment",
+			Service:   "worker",
+			StartTime: baseTime.Add(200 * time.Millisecond),
+			EndTime:   baseTime.Add(200 * time.Millisecond),
+			Status:    "ERROR",
 		},
 	}
 
-	for _, event := range events {
-		err = s.Append(event)
-		if err != nil {
+	for _, span := range spans {
+		if err := s.AppendSpan(span); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -367,8 +310,8 @@ func TestGetTraces(t *testing.T) {
 	case trace1.HasError != false:
 		t.Errorf("expected no error, got %v", trace1.HasError)
 
-	case trace1.Duration != 0:
-		t.Errorf("expected duration 0ms, got %d", trace1.Duration)
+	case trace1.Duration != 100:
+		t.Errorf("expected duration 100ms, got %d", trace1.Duration)
 
 	}
 }

@@ -41,11 +41,31 @@ func (d *DualWriteStore) Append(event model.Event) error {
 		return err
 	}
 
-	if err := d.secondary.Append(event); err != nil {
-		log.Printf("warning: failed to write to secondary store: %v", err)
-	}
+	go func() {
+		if err := d.secondary.Append(event); err != nil {
+			log.Printf("warning: failed to write to secondary store: %v", err)
+		}
+	}()
 
 	return nil
+}
+
+func (d *DualWriteStore) AppendSpan(span model.Span) error {
+	if err := d.primary.AppendSpan(span); err != nil {
+		return err
+	}
+
+	go func() {
+		if err := d.secondary.AppendSpan(span); err != nil {
+			log.Printf("warning: failed to write span to secondary store: %v", err)
+		}
+	}()
+
+	return nil
+}
+
+func (d *DualWriteStore) GetTraceSpans(traceID string) ([]model.Span, error) {
+	return d.primary.GetTraceSpans(traceID)
 }
 
 func (d *DualWriteStore) Recent(n int) ([]model.Event, error) {

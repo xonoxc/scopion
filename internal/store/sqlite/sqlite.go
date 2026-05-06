@@ -7,6 +7,7 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/google/uuid"
 	"github.com/xonoxc/scopion/internal/model"
 	migrateable "github.com/xonoxc/scopion/internal/store/migratable"
 )
@@ -200,17 +201,59 @@ func (s *SqliteStore) GetServices() ([]model.ServiceInfo, error) {
 	return results, rows.Err()
 }
 
+func (s *SqliteStore) AppendSpan(span model.Span) error {
+	spanID := uuid.NewString()
+	_, err := s.db.Exec(
+		"INSERT INTO spans (trace_id, span_id, parent_span_id, name, service, start_time, end_time, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		span.TraceID, spanID, span.ParentSpanID, span.Name, span.Service, span.StartTime, span.EndTime, span.Status,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to insert span: %w", err)
+	}
+	return nil
+}
+
+func (s *SqliteStore) GetTraceSpans(traceID string) ([]model.Span, error) {
+	rows, err := s.db.Query(
+		"SELECT trace_id, span_id, parent_span_id, name, service, start_time, end_time, status FROM spans WHERE trace_id = ? ORDER BY start_time ASC",
+		traceID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query spans: %w", err)
+	}
+	defer rows.Close()
+
+	var spans []model.Span
+	for rows.Next() {
+		var sp model.Span
+		var parentSpanID sql.NullString
+		err := rows.Scan(&sp.TraceID, &sp.SpanID, &parentSpanID, &sp.Name, &sp.Service, &sp.StartTime, &sp.EndTime, &sp.Status)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan span: %w", err)
+		}
+		if parentSpanID.Valid {
+			ps := parentSpanID.String
+			sp.ParentSpanID = &ps
+		}
+		spans = append(spans, sp)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	return spans, nil
+}
+
 func (s *SqliteStore) GetTraces(limit int) ([]model.TraceInfo, error) {
-	// For now, group events by trace_id to simulate traces
 	query := `
 		SELECT
 			trace_id,
-			GROUP_CONCAT(name, ', ') as names,
+			MIN(start_time) as start_time,
+			MAX(end_time) as end_time,
 			COUNT(*) as span_count,
-			MIN(timestamp) as start_time,
-			MAX(timestamp) as end_time,
-			CASE WHEN SUM(CASE WHEN level = 'error' THEN 1 ELSE 0 END) > 0 THEN 1 ELSE 0 END as has_error
-		FROM events
+			MAX(CASE WHEN status = 'ERROR' THEN 1 ELSE 0 END) as has_error
+		FROM spans
 		GROUP BY trace_id
 		ORDER BY start_time DESC
 		LIMIT ?
@@ -227,9 +270,8 @@ func (s *SqliteStore) GetTraces(limit int) ([]model.TraceInfo, error) {
 		var t model.TraceInfo
 		var startTimeStr, endTimeStr string
 		var hasErrorInt int
-		var names string
 
-		err := rows.Scan(&t.ID, &names, &t.Spans, &startTimeStr, &endTimeStr, &hasErrorInt)
+		err := rows.Scan(&t.ID, &startTimeStr, &endTimeStr, &t.Spans, &hasErrorInt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan trace info: %w", err)
 		}
@@ -244,7 +286,6 @@ func (s *SqliteStore) GetTraces(limit int) ([]model.TraceInfo, error) {
 			return nil, fmt.Errorf("failed to parse end time: %w", err)
 		}
 
-		t.Name = names // For simplicity, use concatenated names
 		t.Timestamp = startTime
 		t.HasError = hasErrorInt == 1
 		t.Duration = int(endTime.Sub(startTime).Milliseconds())

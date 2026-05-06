@@ -34,6 +34,13 @@ type Storage interface {
 	GetEventsByTraceID(traceID string) ([]model.Event, error)
 
 	/*
+		span related methods
+	*/
+	AppendSpan(span model.Span) error
+
+	GetTraceSpans(traceID string) ([]model.Span, error)
+
+	/*
 		search related methods
 	*/
 	SearchEvents(query string, limit int) ([]model.Event, error)
