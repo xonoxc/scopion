@@ -133,13 +133,12 @@ func (p *PostgresStore) GetTraces(limit int) ([]model.TraceInfo, error) {
 		SELECT
 			trace_id,
 			string_agg(name, ', ') AS names,
-			service,
 			COUNT(*) AS span_count,
 			MIN(timestamp) AS start_time,
 			MAX(timestamp) AS end_time,
 			BOOL_OR(level = 'error') AS has_error
 		FROM events
-		GROUP BY trace_id, service
+		GROUP BY trace_id
 		ORDER BY start_time DESC
 		LIMIT $1
 	`
@@ -157,7 +156,7 @@ func (p *PostgresStore) GetTraces(limit int) ([]model.TraceInfo, error) {
 		var names string
 		var startTime, endTime time.Time
 
-		err := rows.Scan(&t.ID, &names, &t.Service, &t.Spans, &startTime, &endTime, &t.HasError)
+		err := rows.Scan(&t.ID, &names, &t.Spans, &startTime, &endTime, &t.HasError)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan trace info: %w", err)
 		}

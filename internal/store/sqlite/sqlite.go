@@ -206,13 +206,12 @@ func (s *SqliteStore) GetTraces(limit int) ([]model.TraceInfo, error) {
 		SELECT
 			trace_id,
 			GROUP_CONCAT(name, ', ') as names,
-			service,
 			COUNT(*) as span_count,
 			MIN(timestamp) as start_time,
 			MAX(timestamp) as end_time,
 			CASE WHEN SUM(CASE WHEN level = 'error' THEN 1 ELSE 0 END) > 0 THEN 1 ELSE 0 END as has_error
 		FROM events
-		GROUP BY trace_id, service
+		GROUP BY trace_id
 		ORDER BY start_time DESC
 		LIMIT ?
 	`
@@ -230,7 +229,7 @@ func (s *SqliteStore) GetTraces(limit int) ([]model.TraceInfo, error) {
 		var hasErrorInt int
 		var names string
 
-		err := rows.Scan(&t.ID, &names, &t.Service, &t.Spans, &startTimeStr, &endTimeStr, &hasErrorInt)
+		err := rows.Scan(&t.ID, &names, &t.Spans, &startTimeStr, &endTimeStr, &hasErrorInt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan trace info: %w", err)
 		}

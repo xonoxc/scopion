@@ -26,5 +26,6 @@ func GetAll() []Migration {
 	return []Migration{
 		&CreateEventsTable{},
 		&AddEventDataColumn{},
+		&CreateSpansTable{},
 	}
 }
