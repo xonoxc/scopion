@@ -9,8 +9,10 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/pressly/goose/v3"
+	"github.com/xonoxc/scopion/internal/app/appcontext"
 	"github.com/xonoxc/scopion/internal/model"
+	"github.com/xonoxc/scopion/internal/store/migrations"
+	migrateable "github.com/xonoxc/scopion/internal/store/migratable"
 	"github.com/xonoxc/scopion/internal/store/sqlite"
 )
 
@@ -21,14 +23,13 @@ func TestEventsHandler(t *testing.T) {
 	}
 	defer db.Close()
 
-	if err := goose.SetDialect("sqlite3"); err != nil {
-		t.Fatal(err)
-	}
-	if err := goose.Up(db, "../../migrations"); err != nil {
+	migrator := migrations.NewMigrator(migrations.GetAll())
+	if err := migrator.Migrate(db, migrateable.SQLITE); err != nil {
 		t.Fatal(err)
 	}
 
 	s := sqlite.NewWithDB(db)
+	as := appcontext.NewAtomicAppState(s, "sqlite")
 
 	// Insert event
 	ts := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -38,7 +39,7 @@ func TestEventsHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	handler := EventsHandler(s)
+	handler := EventsHandler(as)
 
 	req := httptest.NewRequest("GET", "/api/events", nil)
 	w := httptest.NewRecorder()
@@ -66,14 +67,13 @@ func TestTraceEventsHandler(t *testing.T) {
 	}
 	defer db.Close()
 
-	if err := goose.SetDialect("sqlite3"); err != nil {
-		t.Fatal(err)
-	}
-	if err := goose.Up(db, "../../migrations"); err != nil {
+	migrator := migrations.NewMigrator(migrations.GetAll())
+	if err := migrator.Migrate(db, migrateable.SQLITE); err != nil {
 		t.Fatal(err)
 	}
 
 	s := sqlite.NewWithDB(db)
+	as := appcontext.NewAtomicAppState(s, "sqlite")
 
 	// Insert multiple events for the same trace
 	baseTime := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -94,7 +94,7 @@ func TestTraceEventsHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	handler := TraceEventsHandler(s)
+	handler := TraceEventsHandler(as)
 
 	req := httptest.NewRequest("GET", "/api/trace-events?trace_id=trace123", nil)
 	w := httptest.NewRecorder()
@@ -135,16 +135,15 @@ func TestTraceEventsHandlerNoTraceID(t *testing.T) {
 	}
 	defer db.Close()
 
-	if err := goose.SetDialect("sqlite3"); err != nil {
-		t.Fatal(err)
-	}
-	if err := goose.Up(db, "../../migrations"); err != nil {
+	migrator := migrations.NewMigrator(migrations.GetAll())
+	if err := migrator.Migrate(db, migrateable.SQLITE); err != nil {
 		t.Fatal(err)
 	}
 
 	s := sqlite.NewWithDB(db)
+	as := appcontext.NewAtomicAppState(s, "sqlite")
 
-	handler := TraceEventsHandler(s)
+	handler := TraceEventsHandler(as)
 
 	req := httptest.NewRequest("GET", "/api/trace-events", nil)
 	w := httptest.NewRecorder()
@@ -163,16 +162,15 @@ func TestTraceEventsHandlerNotFound(t *testing.T) {
 	}
 	defer db.Close()
 
-	if err := goose.SetDialect("sqlite3"); err != nil {
-		t.Fatal(err)
-	}
-	if err := goose.Up(db, "../../migrations"); err != nil {
+	migrator := migrations.NewMigrator(migrations.GetAll())
+	if err := migrator.Migrate(db, migrateable.SQLITE); err != nil {
 		t.Fatal(err)
 	}
 
 	s := sqlite.NewWithDB(db)
+	as := appcontext.NewAtomicAppState(s, "sqlite")
 
-	handler := TraceEventsHandler(s)
+	handler := TraceEventsHandler(as)
 
 	req := httptest.NewRequest("GET", "/api/trace-events?trace_id=nonexistent", nil)
 	w := httptest.NewRecorder()

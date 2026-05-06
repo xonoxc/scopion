@@ -7,8 +7,9 @@ import (
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/pressly/goose/v3"
 	"github.com/xonoxc/scopion/internal/live"
+	"github.com/xonoxc/scopion/internal/store/migrations"
+	migrateable "github.com/xonoxc/scopion/internal/store/migratable"
 	"github.com/xonoxc/scopion/internal/store/sqlite"
 )
 
@@ -19,10 +20,8 @@ func TestHandler(t *testing.T) {
 	}
 	defer db.Close()
 
-	if err := goose.SetDialect("sqlite3"); err != nil {
-		t.Fatal(err)
-	}
-	if err := goose.Up(db, "../../migrations"); err != nil {
+	migrator := migrations.NewMigrator(migrations.GetAll())
+	if err := migrator.Migrate(db, migrateable.SQLITE); err != nil {
 		t.Fatal(err)
 	}
 
@@ -57,10 +56,8 @@ func TestHandlerWithCustomData(t *testing.T) {
 	}
 	defer db.Close()
 
-	if err := goose.SetDialect("sqlite3"); err != nil {
-		t.Fatal(err)
-	}
-	if err := goose.Up(db, "../../migrations"); err != nil {
+	migrator := migrations.NewMigrator(migrations.GetAll())
+	if err := migrator.Migrate(db, migrateable.SQLITE); err != nil {
 		t.Fatal(err)
 	}
 

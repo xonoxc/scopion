@@ -3,25 +3,30 @@ package live
 import (
 	"encoding/json"
 	"net/http"
-
-	"github.com/xonoxc/scopion/internal/model"
 )
 
 func SSE(b *Broadcaster) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
 
-		ch := make(chan model.Event, 16)
-		b.register <- ch
-		defer func() { b.unregister <- ch }()
+		ch := make(chan Message, 16)
+		b.Subscribe(ch)
+		defer b.Unsubscribe(ch)
 
-		for e := range ch {
-			data, _ := json.Marshal(e)
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+			return
+		}
+
+		for msg := range ch {
+			data, _ := json.Marshal(msg)
 			w.Write([]byte("data: "))
 			w.Write(data)
 			w.Write([]byte("\n\n"))
-			w.(http.Flusher).Flush()
+			flusher.Flush()
 		}
 	}
 }

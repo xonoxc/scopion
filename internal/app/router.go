@@ -44,6 +44,7 @@ func (a *AppRouter) getRoutes() []Route {
 		{Path: "/api/live", Handler: live.SSE(a.broadcaster)},
 		{Path: "/api/events", Handler: api.EventsHandler(a.appState)},
 		{Path: "/api/trace-events", Handler: api.TraceEventsHandler(a.appState)},
+		{Path: "/api/trace-spans", Handler: api.TraceSpansHandler(a.appState)},
 		{Path: "/api/stats", Handler: api.StatsHandler(a.appState)},
 		{Path: "/api/throughput", Handler: api.ThroughputHandler(a.appState)},
 		{Path: "/api/errors-by-service", Handler: api.ErrorsByServiceHandler(a.appState)},
@@ -52,6 +53,7 @@ func (a *AppRouter) getRoutes() []Route {
 		{Path: "/api/search", Handler: api.SearchHandler(a.appState)},
 		{Path: "/api/status", Handler: api.StatusHandler(a.config.IsDemoMode())},
 		{Path: "/ingest", Handler: ingest.Handler(a.appState.Snapshot().Store, a.broadcaster)},
+		{Path: "/ingest-span", Handler: ingest.SpanHandler(a.appState.Snapshot().Store, a.broadcaster)},
 	}
 }
 
