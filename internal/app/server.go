@@ -11,16 +11,18 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pressly/goose/v3"
+	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/xonoxc/scopion/internal/api/middleware"
 	"github.com/xonoxc/scopion/internal/app/appcontext"
 	"github.com/xonoxc/scopion/internal/demo"
 	"github.com/xonoxc/scopion/internal/live"
+	"github.com/xonoxc/scopion/internal/store/migrations"
 	"github.com/xonoxc/scopion/internal/store/sqlite"
 	"github.com/xonoxc/scopion/ui"
 
 	appstorage "github.com/xonoxc/scopion/internal/store"
+	migrateable "github.com/xonoxc/scopion/internal/store/migratable"
 )
 
 /*
@@ -68,39 +70,33 @@ func StartServerWithConfig(ctx context.Context, port string, config ServerConfig
 	}
 	defer db.Close()
 
-	if err := goose.SetDialect("sqlite3"); err != nil {
-		return err
-	}
-	if err := goose.Up(db, "migrations"); err != nil {
+	migrator := migrations.NewMigrator(migrations.GetAll())
+	if err := migrator.Migrate(db, migrateable.SQLITE); err != nil {
 		return err
 	}
 
-	store, err := sqlite.New("./scopion.db")
-	if err != nil {
-		return err
-	}
-	defer store.Close()
+	store := sqlite.NewWithDB(db)
 
-	as := appcontext.NewAtomicAppState(store, appstorage.DUAL_WRITE)
+	as := appcontext.NewAtomicAppState(store, appstorage.SINGLE_PRIMARY)
 
 	broadcaster := live.New()
 
 	if config.Mode == DEMO_MODE {
 		log.Println("Demo mode enabled - generating sample telemetry data")
-		demo.Start(store, broadcaster)
+		demo.Start(as, broadcaster)
 	}
 
 	router := NewAppRouter(as, broadcaster, config)
-	router.Setup()
+	mux := router.Setup()
 
 	sub, err := fs.Sub(ui.FS, "dist")
 	if err != nil {
 		return err
 	}
 
-	http.Handle("/", middleware.LoggingMiddleware(http.FileServer(http.FS(sub))))
+	mux.Handle("/", middleware.LoggingMiddleware(http.FileServer(http.FS(sub))))
 
-	server := &http.Server{Addr: ":" + port, Handler: nil}
+	server := &http.Server{Addr: ":" + port, Handler: mux}
 
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)

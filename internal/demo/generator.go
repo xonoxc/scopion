@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/xonoxc/scopion/internal/app/appcontext"
 	"github.com/xonoxc/scopion/internal/live"
 	"github.com/xonoxc/scopion/internal/model"
-	"github.com/xonoxc/scopion/internal/store"
 )
 
 var (
@@ -111,19 +111,19 @@ func generateCustomData(service, name string) map[string]any {
 	return data
 }
 
-func Start(store store.Storage, live *live.Broadcaster) {
-	generateHistoricalData(store)
+func Start(as *appcontext.AtomicAppState, live *live.Broadcaster) {
+	generateHistoricalData(as)
 
-	go generateAPIRequests(store, live)
-	go generateWorkerTasks(store, live)
-	go generateWebhookEvents(store, live)
-	go generateCronJobs(store, live)
-	go generateSchedulerTasks(store, live)
-	go generateAuthEvents(store, live)
-	go generatePaymentEvents(store, live)
+	go generateAPIRequests(as, live)
+	go generateWorkerTasks(as, live)
+	go generateWebhookEvents(as, live)
+	go generateCronJobs(as, live)
+	go generateSchedulerTasks(as, live)
+	go generateAuthEvents(as, live)
+	go generatePaymentEvents(as, live)
 }
 
-func generateHistoricalData(store store.Storage) {
+func generateHistoricalData(as *appcontext.AtomicAppState) {
 	now := time.Now()
 	for range 200 {
 		pastTime := now.Add(-time.Duration(rand.Intn(86400)) * time.Second)
@@ -137,143 +137,144 @@ func generateHistoricalData(store store.Storage) {
 			level = "error"
 		}
 
-		emitWithTime(store, nil, service, endpoint, traceID, level, pastTime)
+		emitWithTime(as, nil, service, endpoint, traceID, level, pastTime)
 
 		if rand.Float64() < 0.6 {
 			pastTime2 := pastTime.Add(time.Duration(rand.Intn(500)) * time.Millisecond)
-			emitWithTime(store, nil, service, "db operation", traceID, level, pastTime2)
+			emitWithTime(as, nil, service, "db operation", traceID, level, pastTime2)
 		}
 	}
 }
 
-func generateAPIRequests(store store.Storage, live *live.Broadcaster) {
+func generateAPIRequests(as *appcontext.AtomicAppState, live *live.Broadcaster) {
 	apiEndpoints := []string{"GET /users", "POST /login", "GET /orders", "PUT /profile", "DELETE /session"}
 	for {
 		traceID := randomID()
 		endpoint := apiEndpoints[rand.Intn(len(apiEndpoints))]
 
-		emit(store, live, "api", endpoint, traceID, "info")
+		emit(as, live, "api", endpoint, traceID, "info")
 		time.Sleep(time.Duration(50+rand.Intn(100)) * time.Millisecond)
 
 		if rand.Float64() < 0.1 {
-			emit(store, live, "api", "db query", traceID, "error")
+			emit(as, live, "api", "db query", traceID, "error")
 		} else {
-			emit(store, live, "api", "db query", traceID, "info")
+			emit(as, live, "api", "db query", traceID, "info")
 		}
 
 		time.Sleep(time.Duration(200+rand.Intn(800)) * time.Millisecond)
 	}
 }
 
-func generateWorkerTasks(store store.Storage, live *live.Broadcaster) {
+func generateWorkerTasks(as *appcontext.AtomicAppState, live *live.Broadcaster) {
 	workerTasks := []string{"ProcessPayment", "SendEmail", "GenerateReport", "CleanupData"}
 	for {
 		traceID := randomID()
 		task := workerTasks[rand.Intn(len(workerTasks))]
 
-		emit(store, live, "worker", task, traceID, "info")
+		emit(as, live, "worker", task, traceID, "info")
 		time.Sleep(time.Duration(100+rand.Intn(200)) * time.Millisecond)
 
 		if rand.Float64() < 0.2 {
-			emit(store, live, "worker", "db update", traceID, "error")
+			emit(as, live, "worker", "db update", traceID, "error")
 		} else {
-			emit(store, live, "worker", "db update", traceID, "info")
+			emit(as, live, "worker", "db update", traceID, "info")
 		}
 
 		time.Sleep(time.Duration(500+rand.Intn(1500)) * time.Millisecond)
 	}
 }
 
-func generateWebhookEvents(store store.Storage, live *live.Broadcaster) {
+func generateWebhookEvents(as *appcontext.AtomicAppState, live *live.Broadcaster) {
 	webhookEvents := []string{"POST /webhook/payment", "POST /webhook/order", "POST /webhook/user"}
 	for {
 		traceID := randomID()
 		event := webhookEvents[rand.Intn(len(webhookEvents))]
 
-		emit(store, live, "webhook", event, traceID, "info")
+		emit(as, live, "webhook", event, traceID, "info")
 		time.Sleep(time.Duration(200+rand.Intn(500)) * time.Millisecond)
 
 		if rand.Float64() < 0.15 {
-			emit(store, live, "webhook", "process webhook", traceID, "error")
+			emit(as, live, "webhook", "process webhook", traceID, "error")
 		}
 
 		time.Sleep(time.Duration(1000+rand.Intn(3000)) * time.Millisecond)
 	}
 }
 
-func generateCronJobs(store store.Storage, live *live.Broadcaster) {
+func generateCronJobs(as *appcontext.AtomicAppState, live *live.Broadcaster) {
 	cronJobs := []string{"CleanupSessions", "ArchiveOldData", "GenerateDailyReport", "SyncExternalData"}
 	for {
 		traceID := randomID()
 		job := cronJobs[rand.Intn(len(cronJobs))]
 
-		emit(store, live, "cron", job, traceID, "info")
+		emit(as, live, "cron", job, traceID, "info")
 		time.Sleep(time.Duration(500+rand.Intn(1000)) * time.Millisecond)
 
 		if rand.Float64() < 0.05 {
-			emit(store, live, "cron", "file operation", traceID, "error")
+			emit(as, live, "cron", "file operation", traceID, "error")
 		}
 
 		time.Sleep(time.Duration(30000+rand.Intn(60000)) * time.Millisecond)
 	}
 }
 
-func generateSchedulerTasks(store store.Storage, live *live.Broadcaster) {
+func generateSchedulerTasks(as *appcontext.AtomicAppState, live *live.Broadcaster) {
 	schedulerTasks := []string{"ScheduleTask", "QueueJob", "ProcessQueue", "UpdateMetrics"}
 	for {
 		traceID := randomID()
 		task := schedulerTasks[rand.Intn(len(schedulerTasks))]
 
-		emit(store, live, "scheduler", task, traceID, "info")
+		emit(as, live, "scheduler", task, traceID, "info")
 		time.Sleep(time.Duration(200+rand.Intn(400)) * time.Millisecond)
 
 		if rand.Float64() < 0.08 {
-			emit(store, live, "scheduler", "queue operation", traceID, "error")
+			emit(as, live, "scheduler", "queue operation", traceID, "error")
 		}
 
 		time.Sleep(time.Duration(2000+rand.Intn(5000)) * time.Millisecond)
 	}
 }
 
-func generateAuthEvents(store store.Storage, live *live.Broadcaster) {
+func generateAuthEvents(as *appcontext.AtomicAppState, live *live.Broadcaster) {
 	authEvents := []string{"ValidateToken", "RefreshToken", "PasswordReset", "UserLogin"}
 	for {
 		traceID := randomID()
 		event := authEvents[rand.Intn(len(authEvents))]
 
-		emit(store, live, "auth", event, traceID, "info")
+		emit(as, live, "auth", event, traceID, "info")
 		time.Sleep(time.Duration(100+rand.Intn(300)) * time.Millisecond)
 
 		if rand.Float64() < 0.12 {
-			emit(store, live, "auth", "db lookup", traceID, "error")
+			emit(as, live, "auth", "db lookup", traceID, "error")
 		}
 
 		time.Sleep(time.Duration(1000+rand.Intn(2000)) * time.Millisecond)
 	}
 }
 
-func generatePaymentEvents(store store.Storage, live *live.Broadcaster) {
+func generatePaymentEvents(as *appcontext.AtomicAppState, live *live.Broadcaster) {
 	paymentEvents := []string{"ChargeCard", "RefundPayment", "ValidatePayment", "ProcessRefund"}
 	for {
 		traceID := randomID()
 		event := paymentEvents[rand.Intn(len(paymentEvents))]
 
-		emit(store, live, "payment", event, traceID, "info")
+		emit(as, live, "payment", event, traceID, "info")
 		time.Sleep(time.Duration(150+rand.Intn(350)) * time.Millisecond)
 
 		if rand.Float64() < 0.25 {
-			emit(store, live, "payment", "payment gateway", traceID, "error")
+			emit(as, live, "payment", "payment gateway", traceID, "error")
 		}
 
 		time.Sleep(time.Duration(800+rand.Intn(2000)) * time.Millisecond)
 	}
 }
 
-func emit(store store.Storage, live *live.Broadcaster, service, name, traceID, level string) {
-	emitWithTime(store, live, service, name, traceID, level, time.Now())
+func emit(as *appcontext.AtomicAppState, live *live.Broadcaster, service, name, traceID, level string) {
+	emitWithTime(as, live, service, name, traceID, level, time.Now())
 }
 
-func emitWithTime(store store.Storage, live *live.Broadcaster, service, name, traceID, level string, timestamp time.Time) {
+func emitWithTime(as *appcontext.AtomicAppState, live *live.Broadcaster, service, name, traceID, level string, timestamp time.Time) {
+	store := as.Snapshot().Store
 	e := model.Event{
 		ID:        uuid.New().String(),
 		Timestamp: timestamp,

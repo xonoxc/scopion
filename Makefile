@@ -8,6 +8,9 @@ UI_DIST := ui/dist
 BIN_DIR := bin
 BIN := $(BIN_DIR)/$(APP_NAME)
 
+PORT ?= 8080
+DEMO ?= true
+
 # =========================
 # Default target
 # =========================
@@ -47,8 +50,7 @@ ui-build:
 # Backend
 # =========================
 run: build
-	@echo "Running embedded binary..."
-	@$(BIN)
+	@$(BIN) start --port $(PORT) --demo=$(DEMO)
 
 build: ui-build
 	@echo "Building $(APP_NAME) binary..."
@@ -63,7 +65,7 @@ dev:
 	@echo "Starting UI dev server (http://localhost:5173)..."
 	cd $(UI_DIR) && npm run dev & \
 	echo "Starting Go backend (no embedded UI)..." && \
-	$(GO_CMD) run ./cmd/$(APP_NAME)
+	$(GO_CMD) run ./cmd/$(APP_NAME) start --port $(PORT) --demo=$(DEMO)
 
 # =========================
 # Tests

@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/xonoxc/scopion/internal/app/appcontext"
 	"github.com/xonoxc/scopion/internal/live"
 	"github.com/xonoxc/scopion/internal/model"
-	"github.com/xonoxc/scopion/internal/store"
 )
 
 type spanPayload struct {
@@ -21,7 +21,7 @@ type spanPayload struct {
 	Status       string     `json:"status"`
 }
 
-func SpanHandler(s store.Storage, b *live.Broadcaster) http.HandlerFunc {
+func SpanHandler(as *appcontext.AtomicAppState, b *live.Broadcaster) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var p spanPayload
 		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
@@ -50,6 +50,7 @@ func SpanHandler(s store.Storage, b *live.Broadcaster) http.HandlerFunc {
 			Status:       p.Status,
 		}
 
+		s := as.Snapshot().Store
 		if err := s.AppendSpan(span); err != nil {
 			http.Error(w, "Failed to store span", http.StatusInternalServerError)
 			return

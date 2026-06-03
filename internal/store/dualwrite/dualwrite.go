@@ -2,6 +2,7 @@ package dualwrite
 
 import (
 	"log"
+	"sync"
 
 	"github.com/xonoxc/scopion/internal/model"
 	"github.com/xonoxc/scopion/internal/store"
@@ -15,6 +16,7 @@ import (
 type DualWriteStore struct {
 	primary   store.Storage
 	secondary store.Storage
+	wg        sync.WaitGroup
 }
 
 func New(primary, secondary store.Storage) *DualWriteStore {
@@ -41,7 +43,9 @@ func (d *DualWriteStore) Append(event model.Event) error {
 		return err
 	}
 
+	d.wg.Add(1)
 	go func() {
+		defer d.wg.Done()
 		if err := d.secondary.Append(event); err != nil {
 			log.Printf("warning: failed to write to secondary store: %v", err)
 		}
@@ -55,7 +59,9 @@ func (d *DualWriteStore) AppendSpan(span model.Span) error {
 		return err
 	}
 
+	d.wg.Add(1)
 	go func() {
+		defer d.wg.Done()
 		if err := d.secondary.AppendSpan(span); err != nil {
 			log.Printf("warning: failed to write span to secondary store: %v", err)
 		}
@@ -97,6 +103,7 @@ func (d *DualWriteStore) GetThroughput(hours int) ([]model.ThroughputData, error
 }
 
 func (d *DualWriteStore) Close() error {
+	d.wg.Wait()
 	if err := d.primary.Close(); err != nil {
 		return err
 	}

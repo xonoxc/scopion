@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/xonoxc/scopion/internal/app/appcontext"
 	"github.com/xonoxc/scopion/internal/live"
+	"github.com/xonoxc/scopion/internal/store"
 	"github.com/xonoxc/scopion/internal/store/migrations"
 	migrateable "github.com/xonoxc/scopion/internal/store/migratable"
 	"github.com/xonoxc/scopion/internal/store/sqlite"
@@ -49,11 +51,12 @@ func TestEmitWithCustomData(t *testing.T) {
 	}
 
 	s := sqlite.NewWithDB(db)
+	as := appcontext.NewAtomicAppState(s, store.SINGLE_PRIMARY)
 
 	b := live.New()
 
 	// Emit an event - it should have custom data
-	emit(s, b, "api", "GET /users", "trace123", "info")
+	emit(as, b, "api", "GET /users", "trace123", "info")
 
 	events, err := s.Recent(10)
 	if err != nil {
@@ -86,8 +89,9 @@ func TestHistoricalDataGeneration(t *testing.T) {
 	}
 
 	s := sqlite.NewWithDB(db)
+	as := appcontext.NewAtomicAppState(s, store.SINGLE_PRIMARY)
 
-	generateHistoricalData(s)
+	generateHistoricalData(as)
 
 	events, err := s.Recent(300) // Should have generated 200 events
 	if err != nil {

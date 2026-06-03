@@ -7,7 +7,9 @@ import (
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/xonoxc/scopion/internal/app/appcontext"
 	"github.com/xonoxc/scopion/internal/live"
+	"github.com/xonoxc/scopion/internal/store"
 	"github.com/xonoxc/scopion/internal/store/migrations"
 	migrateable "github.com/xonoxc/scopion/internal/store/migratable"
 	"github.com/xonoxc/scopion/internal/store/sqlite"
@@ -26,9 +28,10 @@ func TestHandler(t *testing.T) {
 	}
 
 	s := sqlite.NewWithDB(db)
+	as := appcontext.NewAtomicAppState(s, store.SINGLE_PRIMARY)
 	b := live.New()
 
-	handler := Handler(s, b)
+	handler := Handler(as, b)
 
 	req := httptest.NewRequest("POST", "/ingest", strings.NewReader(`{"level":"info","service":"test","name":"event"}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -62,9 +65,10 @@ func TestHandlerWithCustomData(t *testing.T) {
 	}
 
 	s := sqlite.NewWithDB(db)
+	as := appcontext.NewAtomicAppState(s, store.SINGLE_PRIMARY)
 	b := live.New()
 
-	handler := Handler(s, b)
+	handler := Handler(as, b)
 
 	customData := `{
 		"level": "info",

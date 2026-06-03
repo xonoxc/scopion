@@ -25,12 +25,29 @@ func (m *AddEventDataColumn) DownPostgres(tx *sql.Tx) error {
 }
 
 func (m *AddEventDataColumn) UpSqlite(tx *sql.Tx) error {
-	_, err := tx.Exec(`
-		ALTER TABLE events
-		ADD COLUMN data TEXT;
+	rows, err := tx.Query(`PRAGMA table_info(events)`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
 
-	`)
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return err
+		}
+		if name == "data" {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
 
+	_, err = tx.Exec(`ALTER TABLE events ADD COLUMN data TEXT;`)
 	return err
 }
 

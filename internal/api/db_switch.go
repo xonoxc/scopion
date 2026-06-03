@@ -64,6 +64,28 @@ func SwitchDBHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 	}
 }
 
+func PromoteHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		orches := orchestrator.New(as)
+		err := orches.MigrateTo(store.SINGLE_SECONDARY, "")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		resp := SwitchDBResponse{
+			Status:  "ok",
+			Message: "secondary promoted to primary",
+		}
+		httpx.WriteJSON(w, http.StatusOK, resp)
+	}
+}
+
 func ParseDialect(input string) (migrateable.DatabaseName, error) {
 	if strings.TrimSpace(input) == "" {
 		/*

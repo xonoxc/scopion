@@ -41,41 +41,31 @@ func TestExecute(t *testing.T) {
 }
 
 func TestStartServerSignature(t *testing.T) {
-	// Test that startServer function accepts the correct parameters
-	// We can't easily test the full server startup in unit tests due to dependencies,
-	// but we can test that the function signature is correct and basic logic works
-
 	t.Run("function signature", func(t *testing.T) {
-		// Test with immediate timeout to avoid actual server startup
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
 		defer cancel()
 
-		// This will fail due to missing migrations, but we just want to test it doesn't panic
 		err := app.StartServer(ctx, "9999", app.DEMO_MODE)
-		if err == nil {
-			t.Error("Expected error due to missing migrations directory")
+		if err != nil {
+			t.Errorf("Expected clean shutdown, got: %v", err)
 		}
 	})
 
 	t.Run("demo parameter logic", func(t *testing.T) {
-		// We can't test the actual demo logic without setting up the full environment,
-		// but we can verify the function accepts both true and false for demo parameter
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
 		defer cancel()
 
-		// Test with demo=false
 		err1 := app.StartServer(ctx, "9998", app.NORMAL_MODE)
-		if err1 == nil {
-			t.Error("Expected error due to missing migrations directory")
+		if err1 != nil {
+			t.Errorf("Expected clean shutdown for NORMAL_MODE, got: %v", err1)
 		}
 
-		// Test with demo=true
 		ctx2, cancel2 := context.WithTimeout(context.Background(), 1*time.Millisecond)
 		defer cancel2()
 
 		err2 := app.StartServer(ctx2, "9997", app.DEMO_MODE)
-		if err2 == nil {
-			t.Error("Expected error due to missing migrations directory")
+		if err2 != nil {
+			t.Errorf("Expected clean shutdown for DEMO_MODE, got: %v", err2)
 		}
 	})
 }

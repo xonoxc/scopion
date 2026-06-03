@@ -9,16 +9,18 @@ import (
 
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/xonoxc/scopion/internal/app/appcontext"
 	"github.com/xonoxc/scopion/internal/live"
+	"github.com/xonoxc/scopion/internal/store"
 	"github.com/xonoxc/scopion/internal/store/migrations"
 	migrateable "github.com/xonoxc/scopion/internal/store/migratable"
 	"github.com/xonoxc/scopion/internal/store/sqlite"
 )
 
 func TestSpanHandler(t *testing.T) {
-	s, b := setupSpanTest(t)
+	as, b := setupSpanTest(t)
 
-	handler := SpanHandler(s, b)
+	handler := SpanHandler(as, b)
 
 	payload := `{"trace_id":"trace123","name":"http_request","service":"api","start_time":"2026-05-06T10:00:00Z","end_time":"2026-05-06T10:00:01Z","status":"OK"}`
 	req := httptest.NewRequest("POST", "/ingest-span", strings.NewReader(payload))
@@ -31,7 +33,8 @@ func TestSpanHandler(t *testing.T) {
 		t.Errorf("Expected status 202, got %d", w.Code)
 	}
 
-	spans, err := s.GetTraceSpans("trace123")
+	store := as.Snapshot().Store
+	spans, err := store.GetTraceSpans("trace123")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,9 +64,9 @@ func TestSpanHandler(t *testing.T) {
 }
 
 func TestSpanHandlerGeneratesSpanID(t *testing.T) {
-	s, b := setupSpanTest(t)
+	as, b := setupSpanTest(t)
 
-	handler := SpanHandler(s, b)
+	handler := SpanHandler(as, b)
 
 	payload := `{"trace_id":"trace456","name":"db_query","service":"db"}`
 	req := httptest.NewRequest("POST", "/ingest-span", strings.NewReader(payload))
@@ -76,7 +79,8 @@ func TestSpanHandlerGeneratesSpanID(t *testing.T) {
 		t.Errorf("Expected status 202, got %d", w.Code)
 	}
 
-	spans, err := s.GetTraceSpans("trace456")
+	store := as.Snapshot().Store
+	spans, err := store.GetTraceSpans("trace456")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,9 +93,9 @@ func TestSpanHandlerGeneratesSpanID(t *testing.T) {
 }
 
 func TestSpanHandlerWithParentSpanID(t *testing.T) {
-	s, b := setupSpanTest(t)
+	as, b := setupSpanTest(t)
 
-	handler := SpanHandler(s, b)
+	handler := SpanHandler(as, b)
 
 	payload := `{"trace_id":"trace789","span_id":"should-be-ignored","parent_span_id":"parent123","name":"child_span","service":"svc"}`
 	req := httptest.NewRequest("POST", "/ingest-span", strings.NewReader(payload))
@@ -104,7 +108,8 @@ func TestSpanHandlerWithParentSpanID(t *testing.T) {
 		t.Errorf("Expected status 202, got %d", w.Code)
 	}
 
-	spans, err := s.GetTraceSpans("trace789")
+	store := as.Snapshot().Store
+	spans, err := store.GetTraceSpans("trace789")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,9 +127,9 @@ func TestSpanHandlerWithParentSpanID(t *testing.T) {
 }
 
 func TestSpanHandlerDefaultsTimestamps(t *testing.T) {
-	s, b := setupSpanTest(t)
+	as, b := setupSpanTest(t)
 
-	handler := SpanHandler(s, b)
+	handler := SpanHandler(as, b)
 
 	payload := `{"trace_id":"trace999","name":"test","service":"svc"}`
 	req := httptest.NewRequest("POST", "/ingest-span", strings.NewReader(payload))
@@ -139,7 +144,8 @@ func TestSpanHandlerDefaultsTimestamps(t *testing.T) {
 		t.Errorf("Expected status 202, got %d", w.Code)
 	}
 
-	spans, err := s.GetTraceSpans("trace999")
+	store := as.Snapshot().Store
+	spans, err := store.GetTraceSpans("trace999")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,10 +178,11 @@ func setupTestDB(t *testing.T) *sql.DB {
 	return db
 }
 
-func setupSpanTest(t *testing.T) (*sqlite.SqliteStore, *live.Broadcaster) {
+func setupSpanTest(t *testing.T) (*appcontext.AtomicAppState, *live.Broadcaster) {
 	t.Helper()
 	db := setupTestDB(t)
 	s := sqlite.NewWithDB(db)
+	as := appcontext.NewAtomicAppState(s, store.SINGLE_PRIMARY)
 	b := live.New()
-	return s, b
+	return as, b
 }

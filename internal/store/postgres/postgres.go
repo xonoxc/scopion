@@ -334,7 +334,9 @@ func (p *PostgresStore) SearchEvents(query string, limit int) ([]model.Event, er
 		}
 
 		if dataBytes != nil {
-			_ = json.Unmarshal(dataBytes, &e.Data)
+			if err := json.Unmarshal(dataBytes, &e.Data); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal event data: %w", err)
+			}
 		}
 
 		events = append(events, e)
@@ -376,7 +378,9 @@ func (p *PostgresStore) GetEventsByTraceID(traceID string) ([]model.Event, error
 		}
 
 		if dataBytes != nil {
-			_ = json.Unmarshal(dataBytes, &e.Data)
+			if err := json.Unmarshal(dataBytes, &e.Data); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal event data: %w", err)
+			}
 		}
 
 		events = append(events, e)

@@ -52,12 +52,15 @@ func (a *AppRouter) getRoutes() []Route {
 		{Path: "/api/traces", Handler: api.TracesHandler(a.appState)},
 		{Path: "/api/search", Handler: api.SearchHandler(a.appState)},
 		{Path: "/api/status", Handler: api.StatusHandler(a.config.IsDemoMode())},
-		{Path: "/ingest", Handler: ingest.Handler(a.appState.Snapshot().Store, a.broadcaster)},
-		{Path: "/ingest-span", Handler: ingest.SpanHandler(a.appState.Snapshot().Store, a.broadcaster)},
+		{Path: "/api/switch-db", Handler: api.SwitchDBHandler(a.appState)},
+		{Path: "/api/promote-db", Handler: api.PromoteHandler(a.appState)},
+		{Path: "/ingest", Handler: ingest.Handler(a.appState, a.broadcaster)},
+		{Path: "/ingest-span", Handler: ingest.SpanHandler(a.appState, a.broadcaster)},
 	}
 }
 
-func (a *AppRouter) Setup() {
+func (a *AppRouter) Setup() *http.ServeMux {
+	mux := http.NewServeMux()
 	routes := a.getRoutes()
 	globalsMids := a.globalMiddleware()
 
@@ -72,6 +75,8 @@ func (a *AppRouter) Setup() {
 			h = globalsMids[i](h)
 		}
 
-		http.Handle(r.Path, middleware.LoggingMiddleware(h))
+		mux.Handle(r.Path, middleware.LoggingMiddleware(h))
 	}
+
+	return mux
 }

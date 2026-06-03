@@ -76,8 +76,12 @@ var startCmd = &cobra.Command{
 		fmt.Print(scorpionArt)
 		fmt.Println()
 		ctx := context.Background()
+		mode := app.NORMAL_MODE
+		if enableDemo {
+			mode = app.DEMO_MODE
+		}
 		return app.StartServerWithConfig(ctx, port, app.ServerConfig{
-			Mode: app.DEMO_MODE,
+			Mode: mode,
 		})
 	},
 }
