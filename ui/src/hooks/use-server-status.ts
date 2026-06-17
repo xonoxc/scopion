@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { attempt } from "~/lib/attempt"
 
 export interface ServerStatus {
    demo_enabled: boolean
@@ -12,18 +13,19 @@ export function useServerStatus() {
 
    useEffect(() => {
       const fetchStatus = async () => {
-         try {
-            const response = await fetch("/api/status")
-            if (!response.ok) {
-               throw new Error("Failed to fetch server status")
-            }
-            const data = await response.json()
-            setStatus(data)
-         } catch (err) {
-            setError(err instanceof Error ? err.message : "Unknown error")
-         } finally {
-            setLoading(false)
-         }
+         const result = await attempt(
+            fetch("/api/status").then(async res => {
+               if (!res.ok) {
+                  throw new Error("Failed to fetch server status")
+               }
+               return res.json()
+            })
+         )
+         result.match(
+            data => setStatus(data),
+            err => setError(err instanceof Error ? err.message : "Unknown error")
+         )
+         setLoading(false)
       }
 
       fetchStatus()
@@ -31,4 +33,3 @@ export function useServerStatus() {
 
    return { status, loading, error }
 }
-

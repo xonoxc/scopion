@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
+import { attempt } from "~/lib/attempt"
 
 export interface ErrorByService {
    service: string
@@ -24,16 +25,22 @@ export function useErrorsByService(hours: number = 24) {
    return useQuery({
       queryKey: ["errors-by-service", hours],
       queryFn: async (): Promise<ErrorByService[]> => {
-         try {
-            const response = await fetch(`/api/errors-by-service?hours=${hours}`)
-            if (!response.ok) {
-               throw new Error("Failed to fetch errors by service")
+         const result = await attempt(
+            fetch(`/api/errors-by-service?hours=${hours}`).then(async res => {
+               if (!res.ok) {
+                  throw new Error("Failed to fetch errors by service")
+               }
+               return res.json()
+            })
+         )
+
+         return result.match(
+            data => data,
+            e => {
+               console.warn("useErrorsByService: API fetch failed, using mock data:", e)
+               return mockErrorsByService
             }
-            return response.json()
-         } catch (e) {
-            console.warn("useErrorsByService: API fetch failed, using mock data:", e)
-            return mockErrorsByService
-         }
+         )
       },
       refetchInterval: 10000,
       retry: false,

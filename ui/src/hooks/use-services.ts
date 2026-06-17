@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
+import { attempt } from "~/lib/attempt"
 
 interface ServiceInfo {
    name: string
@@ -32,16 +33,19 @@ export function useServices() {
    return useQuery({
       queryKey: ["services"],
       queryFn: async (): Promise<ServiceInfo[]> => {
-         try {
-            const response = await fetch("/api/services")
-            if (!response.ok) {
-               throw new Error("Failed to fetch services")
+         const result = await attempt(
+            fetch("/api/services").then(async res => {
+               if (!res.ok) throw new Error("Failed to fetch services")
+               return res.json()
+            })
+         )
+         return result.match(
+            data => data,
+            e => {
+               console.warn("useServices: API fetch failed, using mock data:", e)
+               return mockServices
             }
-            return response.json()
-         } catch (e) {
-            console.warn("useServices: API fetch failed, using mock data:", e)
-            return mockServices
-         }
+         )
       },
       refetchInterval: 10000,
       retry: false,

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
+import { attempt } from "~/lib/attempt"
 
 export interface Stats {
    total_events: number
@@ -18,16 +19,21 @@ export function useStats() {
    return useQuery({
       queryKey: ["stats"],
       queryFn: async (): Promise<Stats> => {
-         try {
-            const response = await fetch("/api/stats")
-            if (!response.ok) {
-               throw new Error("Failed to fetch stats")
+         const result = await attempt(
+            fetch("/api/stats").then(async res => {
+               if (!res.ok) {
+                  throw new Error("Failed to fetch stats")
+               }
+               return res.json()
+            })
+         )
+         return result.match(
+            data => data,
+            e => {
+               console.warn("useStats: API fetch failed, using mock data:", e)
+               return mockStats
             }
-            return response.json()
-         } catch (e) {
-            console.warn("useStats: API fetch failed, using mock data:", e)
-            return mockStats
-         }
+         )
       },
       refetchInterval: 5000,
       retry: false,

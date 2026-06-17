@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
+import { attempt } from "~/lib/attempt"
 
 interface TraceInfo {
    id: string
@@ -44,16 +45,21 @@ export function useTraces(limit: number = 50) {
    return useQuery({
       queryKey: ["traces", limit],
       queryFn: async (): Promise<TraceInfo[]> => {
-         try {
-            const response = await fetch(`/api/traces?limit=${limit}`)
-            if (!response.ok) {
-               throw new Error("Failed to fetch traces")
+         const result = await attempt(
+            fetch(`/api/traces?limit=${limit}`).then(async res => {
+               if (!res.ok) {
+                  throw new Error("Failed to fetch traces")
+               }
+               return res.json()
+            })
+         )
+         return result.match(
+            data => data,
+            e => {
+               console.warn("useTraces: API fetch failed, using mock data:", e)
+               return mockTraces.slice(0, limit)
             }
-            return response.json()
-         } catch (e) {
-            console.warn("useTraces: API fetch failed, using mock data:", e)
-            return mockTraces.slice(0, limit)
-         }
+         )
       },
       refetchInterval: 10000,
       retry: false,

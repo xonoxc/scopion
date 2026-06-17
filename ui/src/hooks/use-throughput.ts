@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
+import { attempt } from "~/lib/attempt"
 
 export interface ThroughputData {
    time: string
@@ -19,16 +20,21 @@ export function useThroughput(hours: number = 24) {
    return useQuery({
       queryKey: ["throughput", hours],
       queryFn: async (): Promise<ThroughputData[]> => {
-         try {
-            const response = await fetch(`/api/throughput?hours=${hours}`)
-            if (!response.ok) {
-               throw new Error("Failed to fetch throughput")
+         const result = await attempt(
+            fetch(`/api/throughput?hours=${hours}`).then(async res => {
+               if (!res.ok) {
+                  throw new Error("Failed to fetch throughput")
+               }
+               return res.json()
+            })
+         )
+         return result.match(
+            data => data,
+            e => {
+               console.warn("useThroughput: API fetch failed, using mock data:", e)
+               return mockThroughput
             }
-            return response.json()
-         } catch (e) {
-            console.warn("useThroughput: API fetch failed, using mock data:", e)
-            return mockThroughput
-         }
+         )
       },
       refetchInterval: 30000,
       retry: false,
