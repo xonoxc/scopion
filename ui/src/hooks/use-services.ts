@@ -38,8 +38,8 @@ export function useServices() {
                throw new Error("Failed to fetch services")
             }
             return response.json()
-         } catch {
-            // Return mock data if fetch fails
+         } catch (e) {
+            console.warn("useServices: API fetch failed, using mock data:", e)
             return mockServices
          }
       },

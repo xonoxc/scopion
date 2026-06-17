@@ -50,8 +50,8 @@ export function useTraces(limit: number = 50) {
                throw new Error("Failed to fetch traces")
             }
             return response.json()
-         } catch {
-            // Return mock data if fetch fails
+         } catch (e) {
+            console.warn("useTraces: API fetch failed, using mock data:", e)
             return mockTraces.slice(0, limit)
          }
       },

@@ -1,6 +1,8 @@
 package store
 
 import (
+	"time"
+
 	"github.com/xonoxc/scopion/internal/model"
 )
 
@@ -18,6 +20,8 @@ type Storage interface {
 		stats related methods
 	*/
 	GetStats() (*model.Stats, error)
+
+	GetStatsByHours(hours int) (*model.Stats, error)
 
 	/*
 		services related methods
@@ -50,8 +54,11 @@ type Storage interface {
 	*/
 	GetThroughput(hours int) ([]model.ThroughputData, error)
 
-	/*
-	*closing the storage service
-	 */
+	UpsertErrorGroup(message, service, location string) error
+
+	GetErrorGroups(hours int) ([]model.ErrorGroup, error)
+
+	DeleteEventsOlderThan(age time.Duration) (int64, error)
+
 	Close() error
 }

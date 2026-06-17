@@ -14,55 +14,44 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/xonoxc/scopion/internal/api/middleware"
-	"github.com/xonoxc/scopion/internal/app/appcontext"
 	"github.com/xonoxc/scopion/internal/demo"
 	"github.com/xonoxc/scopion/internal/live"
-	"github.com/xonoxc/scopion/internal/store/migrations"
+	"github.com/xonoxc/scopion/internal/pipeline"
 	"github.com/xonoxc/scopion/internal/store/sqlite"
 	"github.com/xonoxc/scopion/ui"
-
-	appstorage "github.com/xonoxc/scopion/internal/store"
-	migrateable "github.com/xonoxc/scopion/internal/store/migratable"
 )
 
-/*
-* TYPE for the modes
- */
 type ServerMode string
 
-/*
-* MODES the application can be started in
- */
 const (
 	DEMO_MODE   ServerMode = "demo"
 	NORMAL_MODE ServerMode = "normal"
 )
 
-/*
-* API server config
-* DEMO_MODE: enables demo mode with sample telemetry data
-* NORMAL_MODE: standard operation mode
- */
 type ServerConfig struct {
-	Mode ServerMode
+	Mode            ServerMode
+	RetentionDays   int
+	CleanupInterval time.Duration
+}
+
+func DefaultServerConfig() ServerConfig {
+	return ServerConfig{
+		Mode:            NORMAL_MODE,
+		RetentionDays:   7,
+		CleanupInterval: 1 * time.Hour,
+	}
 }
 
 func (s *ServerConfig) IsDemoMode() bool {
 	return s.Mode == DEMO_MODE
 }
 
-/*
-* StartServer starts the API server on the specified port with the given mode.
- */
 func StartServer(ctx context.Context, port string, mode ServerMode) error {
 	return StartServerWithConfig(ctx, port, ServerConfig{
 		Mode: mode,
 	})
 }
 
-/*
-* stating server with config
- */
 func StartServerWithConfig(ctx context.Context, port string, config ServerConfig) error {
 	db, err := sql.Open("sqlite3", "./scopion.db")
 	if err != nil {
@@ -70,23 +59,56 @@ func StartServerWithConfig(ctx context.Context, port string, config ServerConfig
 	}
 	defer db.Close()
 
-	migrator := migrations.NewMigrator(migrations.GetAll())
-	if err := migrator.Migrate(db, migrateable.SQLITE); err != nil {
-		return err
-	}
+	db.Exec("PRAGMA journal_mode=WAL")
+	db.Exec("PRAGMA busy_timeout=5000")
+	db.Exec("PRAGMA foreign_keys=ON")
 
 	store := sqlite.NewWithDB(db)
 
-	as := appcontext.NewAtomicAppState(store, appstorage.SINGLE_PRIMARY)
+	if err := store.Migrate(); err != nil {
+		return err
+	}
 
 	broadcaster := live.New()
+	bp := pipeline.New(store, broadcaster)
+
+	pipelineCtx, pipelineCancel := context.WithCancel(context.Background())
+	defer pipelineCancel()
+	go bp.Run(pipelineCtx)
+
+	if config.RetentionDays > 0 {
+		cleanupInterval := config.CleanupInterval
+		if cleanupInterval <= 0 {
+			cleanupInterval = 1 * time.Hour
+		}
+
+		go func() {
+			ticker := time.NewTicker(cleanupInterval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-pipelineCtx.Done():
+					return
+				case <-ticker.C:
+					deleted, err := store.DeleteEventsOlderThan(time.Duration(config.RetentionDays) * 24 * time.Hour)
+					if err != nil {
+						log.Printf("retention cleanup failed: %v", err)
+					} else if deleted > 0 {
+						log.Printf("retention cleanup: deleted %d events older than %d days", deleted, config.RetentionDays)
+					}
+				}
+			}
+		}()
+	}
 
 	if config.Mode == DEMO_MODE {
 		log.Println("Demo mode enabled - generating sample telemetry data")
-		demo.Start(as, broadcaster)
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		demo.Start(ctx, store, broadcaster)
 	}
 
-	router := NewAppRouter(as, broadcaster, config)
+	router := NewAppRouter(store, broadcaster, bp, config)
 	mux := router.Setup()
 
 	sub, err := fs.Sub(ui.FS, "dist")
@@ -94,7 +116,9 @@ func StartServerWithConfig(ctx context.Context, port string, config ServerConfig
 		return err
 	}
 
-	mux.Handle("/", middleware.LoggingMiddleware(http.FileServer(http.FS(sub))))
+	mux.Handle(
+		"/", middleware.LoggingMiddleware(http.FileServer(http.FS(sub))),
+	)
 
 	server := &http.Server{Addr: ":" + port, Handler: mux}
 
@@ -115,7 +139,10 @@ func StartServerWithConfig(ctx context.Context, port string, config ServerConfig
 		log.Println("Context cancelled, shutting down gracefully...")
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(
+		context.Background(),
+		5*time.Second,
+	)
 	defer cancel()
 
 	if err := server.Shutdown(shutdownCtx); err != nil {

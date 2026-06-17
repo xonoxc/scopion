@@ -4,10 +4,10 @@ import (
 	"net/http"
 
 	"github.com/xonoxc/scopion/internal/api/httpx"
-	"github.com/xonoxc/scopion/internal/app/appcontext"
+	"github.com/xonoxc/scopion/internal/store"
 )
 
-func TraceSpansHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
+func TraceSpansHandler(s store.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !httpx.RequireMethod(w, r, http.MethodGet) {
 			return
@@ -18,8 +18,6 @@ func TraceSpansHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 			http.Error(w, "trace_id parameter is required", http.StatusBadRequest)
 			return
 		}
-
-		s := as.Snapshot().Store
 
 		spans, err := s.GetTraceSpans(traceID)
 		if err != nil {

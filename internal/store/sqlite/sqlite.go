@@ -4,33 +4,17 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/google/uuid"
 	"github.com/xonoxc/scopion/internal/model"
-	migrateable "github.com/xonoxc/scopion/internal/store/migratable"
 )
 
 type SqliteStore struct {
 	db *sql.DB
 }
 
-/**
-* implementation for
-*  migratable interface
-**/
-func (s *SqliteStore) DB() *sql.DB {
-	return s.db
-}
-
-func (s *SqliteStore) Dialect() migrateable.DatabaseName {
-	return migrateable.SQLITE
-}
-
-/*
-* Implementation of Storage interface
-**/
 func New(dbPath string) (*SqliteStore, error) {
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
@@ -48,6 +32,85 @@ func NewWithDB(db *sql.DB) *SqliteStore {
 	return &SqliteStore{db: db}
 }
 
+func (s *SqliteStore) Migrate() error {
+	migrations := []struct {
+		id    string
+		sql   string
+		fatal bool
+	}{
+		{
+			id:    "001_create_events",
+			fatal: true,
+			sql: `CREATE TABLE IF NOT EXISTS events (
+				id TEXT PRIMARY KEY,
+				timestamp DATETIME NOT NULL,
+				level TEXT NOT NULL,
+				service TEXT NOT NULL,
+				name TEXT NOT NULL,
+				trace_id TEXT NOT NULL DEFAULT '',
+				data TEXT DEFAULT NULL
+			);
+			CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp DESC);
+			CREATE INDEX IF NOT EXISTS idx_events_service ON events(service);
+			CREATE INDEX IF NOT EXISTS idx_events_level ON events(level);
+			CREATE INDEX IF NOT EXISTS idx_events_trace_id ON events(trace_id);`,
+		},
+		{
+			id:    "002_create_spans",
+			fatal: true,
+			sql: `CREATE TABLE IF NOT EXISTS spans (
+				trace_id TEXT NOT NULL,
+				span_id TEXT NOT NULL,
+				parent_span_id TEXT,
+				name TEXT NOT NULL,
+				service TEXT NOT NULL,
+				start_time DATETIME NOT NULL,
+				end_time DATETIME NOT NULL,
+				status TEXT NOT NULL,
+				PRIMARY KEY (trace_id, span_id)
+			);`,
+		},
+		{
+			id: "003_expand_events",
+			sql: `ALTER TABLE events ADD COLUMN span_id TEXT NOT NULL DEFAULT '';
+			ALTER TABLE events ADD COLUMN environment TEXT NOT NULL DEFAULT 'production';
+			ALTER TABLE events ADD COLUMN duration_ms REAL NOT NULL DEFAULT 0;`,
+			fatal: false,
+		},
+		{
+			id:    "004_create_error_groups",
+			fatal: true,
+			sql: `CREATE TABLE IF NOT EXISTS error_groups (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				message TEXT NOT NULL,
+				service TEXT NOT NULL,
+				location TEXT NOT NULL DEFAULT '',
+				first_seen DATETIME NOT NULL,
+				last_seen DATETIME NOT NULL,
+				count INTEGER NOT NULL DEFAULT 1,
+				resolved INTEGER NOT NULL DEFAULT 0,
+				UNIQUE(message, service, location)
+			);
+			CREATE INDEX IF NOT EXISTS idx_error_groups_last_seen ON error_groups(last_seen DESC);
+			CREATE INDEX IF NOT EXISTS idx_error_groups_service ON error_groups(service);`,
+		},
+	}
+
+	for _, m := range migrations {
+		_, err := s.db.Exec(m.sql)
+		if err != nil {
+			errStr := err.Error()
+			if m.fatal || !(strings.Contains(errStr, "duplicate column") || strings.Contains(errStr, "already exists")) {
+				return fmt.Errorf("migration %s failed: %w", m.id, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+
+
 func (s *SqliteStore) Append(e model.Event) error {
 	var dataJSON []byte
 	var err error
@@ -60,9 +123,13 @@ func (s *SqliteStore) Append(e model.Event) error {
 		dataJSON = nil
 	}
 
+	if e.Environment == "" {
+		e.Environment = "production"
+	}
+
 	_, err = s.db.Exec(
-		"INSERT INTO events (id, timestamp, level, service, name, trace_id, data) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		e.ID, e.Timestamp, e.Level, e.Service, e.Name, e.TraceID, string(dataJSON),
+		"INSERT INTO events (id, timestamp, level, service, name, trace_id, span_id, environment, duration_ms, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		e.ID, e.Timestamp, e.Level, e.Service, e.Name, e.TraceID, e.SpanID, e.Environment, e.DurationMs, string(dataJSON),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert event: %w", err)
@@ -72,7 +139,7 @@ func (s *SqliteStore) Append(e model.Event) error {
 
 func (s *SqliteStore) Recent(n int) ([]model.Event, error) {
 	rows, err := s.db.Query(
-		"SELECT id, timestamp, level, service, name, trace_id, data FROM events ORDER BY timestamp DESC LIMIT ?",
+		"SELECT id, timestamp, level, service, name, trace_id, span_id, environment, duration_ms, data FROM events ORDER BY timestamp DESC LIMIT ?",
 		n,
 	)
 	if err != nil {
@@ -84,7 +151,7 @@ func (s *SqliteStore) Recent(n int) ([]model.Event, error) {
 	for rows.Next() {
 		var e model.Event
 		var dataStr sql.NullString
-		err := rows.Scan(&e.ID, &e.Timestamp, &e.Level, &e.Service, &e.Name, &e.TraceID, &dataStr)
+		err := rows.Scan(&e.ID, &e.Timestamp, &e.Level, &e.Service, &e.Name, &e.TraceID, &e.SpanID, &e.Environment, &e.DurationMs, &dataStr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan event: %w", err)
 		}
@@ -103,42 +170,74 @@ func (s *SqliteStore) Recent(n int) ([]model.Event, error) {
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
-	for i, j := 0, len(events)-1; i < j; i, j = i+1, j-1 {
-		events[i], events[j] = events[j], events[i]
-	}
-
 	return events, nil
 }
 
 func (s *SqliteStore) GetStats() (*model.Stats, error) {
-	var totalEvents int
-	err := s.db.QueryRow("SELECT COUNT(*) FROM events").Scan(&totalEvents)
+	return s.statsSince("")
+}
+
+func (s *SqliteStore) GetStatsByHours(hours int) (*model.Stats, error) {
+	if hours <= 0 {
+		return s.GetStats()
+	}
+	return s.statsSince(fmt.Sprintf(" WHERE timestamp >= datetime('now', '-%d hours')", hours))
+}
+
+func (s *SqliteStore) statsSince(where string) (*model.Stats, error) {
+	var totalEvents, errorEvents, activeServices int
+	err := s.db.QueryRow(fmt.Sprintf(`
+		SELECT
+			COUNT(*) as total,
+			COALESCE(SUM(CASE WHEN level = 'error' THEN 1 ELSE 0 END), 0) as errors,
+			COUNT(DISTINCT service) as services
+		FROM events%s
+	`, where)).Scan(&totalEvents, &errorEvents, &activeServices)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get total events: %w", err)
+		return nil, fmt.Errorf("failed to get stats: %w", err)
 	}
 
-	var errorEvents int
-	err = s.db.QueryRow("SELECT COUNT(*) FROM events WHERE level = 'error'").Scan(&errorEvents)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get error events: %w", err)
-	}
-
-	var activeServices int
-	err = s.db.QueryRow("SELECT COUNT(DISTINCT service) FROM events").Scan(&activeServices)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get active services: %w", err)
-	}
-
-	var errorRate float64
-	if totalEvents > 0 {
-		errorRate = float64(errorEvents) / float64(totalEvents) * 100
-	}
-
-	return &model.Stats{
+	stats := &model.Stats{
 		TotalEvents:    totalEvents,
-		ErrorRate:      errorRate,
 		ActiveServices: activeServices,
-	}, nil
+		ErrorEvents:    errorEvents,
+	}
+
+	if totalEvents > 0 {
+		stats.ErrorRate = float64(errorEvents) / float64(totalEvents) * 100
+	}
+
+	stats.P50Latency = s.percentileSince(0.50, where)
+	stats.P95Latency = s.percentileSince(0.95, where)
+	stats.P99Latency = s.percentileSince(0.99, where)
+
+	return stats, nil
+}
+
+func (s *SqliteStore) percentile(p float64) float64 {
+	return s.percentileSince(p, "")
+}
+
+func (s *SqliteStore) percentileSince(p float64, where string) float64 {
+	query := fmt.Sprintf("SELECT COUNT(*) FROM events WHERE duration_ms > 0%s", where)
+	var count int
+	err := s.db.QueryRow(query).Scan(&count)
+	if err != nil || count == 0 {
+		return 0
+	}
+
+	offset := int(float64(count) * p)
+	if offset >= count {
+		offset = count - 1
+	}
+
+	valQuery := fmt.Sprintf("SELECT duration_ms FROM events WHERE duration_ms > 0%s ORDER BY duration_ms LIMIT 1 OFFSET ?", where)
+	var val float64
+	err = s.db.QueryRow(valQuery, offset).Scan(&val)
+	if err != nil {
+		return 0
+	}
+	return val
 }
 
 func (s *SqliteStore) GetErrorsByService(hours int) ([]model.ErrorByService, error) {
@@ -297,9 +396,8 @@ func (s *SqliteStore) GetTraces(limit int) ([]model.TraceInfo, error) {
 }
 
 func (s *SqliteStore) SearchEvents(query string, limit int) ([]model.Event, error) {
-	// Search in name, service, and trace_id fields
 	searchQuery := `
-		SELECT id, timestamp, level, service, name, trace_id, data
+		SELECT id, timestamp, level, service, name, trace_id, span_id, environment, duration_ms, data
 		FROM events
 		WHERE name LIKE ? OR service LIKE ? OR trace_id LIKE ?
 		ORDER BY timestamp DESC
@@ -317,7 +415,7 @@ func (s *SqliteStore) SearchEvents(query string, limit int) ([]model.Event, erro
 	for rows.Next() {
 		var e model.Event
 		var dataStr sql.NullString
-		err := rows.Scan(&e.ID, &e.Timestamp, &e.Level, &e.Service, &e.Name, &e.TraceID, &dataStr)
+		err := rows.Scan(&e.ID, &e.Timestamp, &e.Level, &e.Service, &e.Name, &e.TraceID, &e.SpanID, &e.Environment, &e.DurationMs, &dataStr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan event: %w", err)
 		}
@@ -337,7 +435,7 @@ func (s *SqliteStore) SearchEvents(query string, limit int) ([]model.Event, erro
 
 func (s *SqliteStore) GetEventsByTraceID(traceID string) ([]model.Event, error) {
 	query := `
-		SELECT id, timestamp, level, service, name, trace_id, data
+		SELECT id, timestamp, level, service, name, trace_id, span_id, environment, duration_ms, data
 		FROM events
 		WHERE trace_id = ?
 		ORDER BY timestamp ASC
@@ -353,7 +451,7 @@ func (s *SqliteStore) GetEventsByTraceID(traceID string) ([]model.Event, error) 
 	for rows.Next() {
 		var e model.Event
 		var dataStr sql.NullString
-		err := rows.Scan(&e.ID, &e.Timestamp, &e.Level, &e.Service, &e.Name, &e.TraceID, &dataStr)
+		err := rows.Scan(&e.ID, &e.Timestamp, &e.Level, &e.Service, &e.Name, &e.TraceID, &e.SpanID, &e.Environment, &e.DurationMs, &dataStr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan event: %w", err)
 		}
@@ -376,7 +474,6 @@ func (s *SqliteStore) GetThroughput(hours int) ([]model.ThroughputData, error) {
 		hours = 24
 	}
 
-	// Calculate events per hour for the last N hours
 	query := `
 		WITH hours AS (
 			SELECT strftime('%Y-%m-%d %H:00:00', datetime('now', '-' || (t.n * 1) || ' hours')) as hour_start
@@ -409,6 +506,56 @@ func (s *SqliteStore) GetThroughput(hours int) ([]model.ThroughputData, error) {
 	}
 
 	return results, rows.Err()
+}
+
+func (s *SqliteStore) UpsertErrorGroup(message, service, location string) error {
+	now := time.Now()
+	_, err := s.db.Exec(`
+		INSERT INTO error_groups (message, service, location, first_seen, last_seen, count)
+		VALUES (?, ?, ?, ?, ?, 1)
+		ON CONFLICT(message, service, location) DO UPDATE SET
+			last_seen = excluded.last_seen,
+			count = count + 1
+	`, message, service, location, now, now)
+	return err
+}
+
+func (s *SqliteStore) GetErrorGroups(hours int) ([]model.ErrorGroup, error) {
+	rows, err := s.db.Query(`
+		SELECT id, message, service, location, first_seen, last_seen, count, resolved
+		FROM error_groups
+		WHERE last_seen >= datetime('now', '-' || ? || ' hours')
+		ORDER BY last_seen DESC
+	`, hours)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query error groups: %w", err)
+	}
+	defer rows.Close()
+
+	var groups []model.ErrorGroup
+	for rows.Next() {
+		var g model.ErrorGroup
+		var resolved int
+		err := rows.Scan(&g.ID, &g.Message, &g.Service, &g.Location, &g.FirstSeen, &g.LastSeen, &g.Count, &resolved)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan error group: %w", err)
+		}
+		g.Resolved = resolved == 1
+		groups = append(groups, g)
+	}
+	return groups, rows.Err()
+}
+
+func (s *SqliteStore) DeleteEventsOlderThan(age time.Duration) (int64, error) {
+	result, err := s.db.Exec(
+		"DELETE FROM events WHERE timestamp < datetime('now', ?)",
+		fmt.Sprintf("-%d seconds", int(age.Seconds())),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to delete old events: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	return n, nil
 }
 
 func (s *SqliteStore) Close() error {

@@ -6,8 +6,8 @@ import (
 	"strconv"
 
 	"github.com/xonoxc/scopion/internal/api/httpx"
-	"github.com/xonoxc/scopion/internal/app/appcontext"
 	"github.com/xonoxc/scopion/internal/model"
+	"github.com/xonoxc/scopion/internal/store"
 )
 
 type ServerStatus struct {
@@ -15,15 +15,27 @@ type ServerStatus struct {
 	Version     string `json:"version"`
 }
 
-func StatsHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
+func StatsHandler(s store.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !httpx.RequireMethod(w, r, http.MethodGet) {
 			return
 		}
 
-		s := as.Snapshot().Store
+		hoursStr := r.URL.Query().Get("hours")
+		hours := 0
+		if hoursStr != "" {
+			if h, err := strconv.Atoi(hoursStr); err == nil && h > 0 {
+				hours = h
+			}
+		}
 
-		stats, err := s.GetStats()
+		var stats *model.Stats
+		var err error
+		if hours > 0 {
+			stats, err = s.GetStatsByHours(hours)
+		} else {
+			stats, err = s.GetStats()
+		}
 		if err != nil {
 			http.Error(w, "Failed to fetch stats", http.StatusInternalServerError)
 			return
@@ -33,7 +45,7 @@ func StatsHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 	}
 }
 
-func ErrorsByServiceHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
+func ErrorsByServiceHandler(s store.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !httpx.RequireMethod(w, r, http.MethodGet) {
 			return
@@ -47,8 +59,6 @@ func ErrorsByServiceHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 			}
 		}
 
-		s := as.Snapshot().Store
-
 		errors, err := s.GetErrorsByService(hours)
 		if err != nil {
 			http.Error(w, "Failed to fetch errors by service", http.StatusInternalServerError)
@@ -59,13 +69,11 @@ func ErrorsByServiceHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 	}
 }
 
-func ServicesHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
+func ServicesHandler(s store.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !httpx.RequireMethod(w, r, http.MethodGet) {
 			return
 		}
-
-		s := as.Snapshot().Store
 
 		services, err := s.GetServices()
 		if err != nil {
@@ -77,7 +85,7 @@ func ServicesHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 	}
 }
 
-func TracesHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
+func TracesHandler(s store.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !httpx.RequireMethod(w, r, http.MethodGet) {
 			return
@@ -91,8 +99,6 @@ func TracesHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 			}
 		}
 
-		s := as.Snapshot().Store
-
 		traces, err := s.GetTraces(limit)
 		if err != nil {
 			http.Error(w, "Failed to fetch traces", http.StatusInternalServerError)
@@ -103,7 +109,7 @@ func TracesHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 	}
 }
 
-func SearchHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
+func SearchHandler(s store.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !httpx.RequireMethod(w, r, http.MethodGet) {
 			return
@@ -114,8 +120,6 @@ func SearchHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 			json.NewEncoder(w).Encode([]model.Event{})
 			return
 		}
-
-		s := as.Snapshot().Store
 
 		events, err := s.SearchEvents(query, 50)
 		if err != nil {
@@ -142,7 +146,7 @@ func StatusHandler(demoEnabled bool) http.HandlerFunc {
 	}
 }
 
-func ThroughputHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
+func ThroughputHandler(s store.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !httpx.RequireMethod(w, r, http.MethodGet) {
 			return
@@ -156,8 +160,6 @@ func ThroughputHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 			}
 		}
 
-		s := as.Snapshot().Store
-
 		throughput, err := s.GetThroughput(hours)
 		if err != nil {
 			http.Error(w, "Failed to fetch throughput", http.StatusInternalServerError)
@@ -168,7 +170,7 @@ func ThroughputHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 	}
 }
 
-func EventsHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
+func EventsHandler(s store.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !httpx.RequireMethod(w, r, http.MethodGet) {
 			return
@@ -182,8 +184,6 @@ func EventsHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 			}
 		}
 
-		s := as.Snapshot().Store
-
 		events, err := s.Recent(limit)
 		if err != nil {
 			http.Error(w, "Failed to fetch events", http.StatusInternalServerError)
@@ -194,7 +194,7 @@ func EventsHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 	}
 }
 
-func TraceEventsHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
+func TraceEventsHandler(s store.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !httpx.RequireMethod(w, r, http.MethodGet) {
 			return
@@ -206,8 +206,6 @@ func TraceEventsHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 			return
 		}
 
-		s := as.Snapshot().Store
-
 		events, err := s.GetEventsByTraceID(traceID)
 		if err != nil {
 			http.Error(w, "Failed to fetch trace events", http.StatusInternalServerError)
@@ -215,5 +213,29 @@ func TraceEventsHandler(as *appcontext.AtomicAppState) http.HandlerFunc {
 		}
 
 		httpx.WriteJSON(w, http.StatusOK, events)
+	}
+}
+
+func ErrorGroupsHandler(s store.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !httpx.RequireMethod(w, r, http.MethodGet) {
+			return
+		}
+
+		hoursStr := r.URL.Query().Get("hours")
+		hours := 24
+		if hoursStr != "" {
+			if h, err := strconv.Atoi(hoursStr); err == nil && h > 0 {
+				hours = h
+			}
+		}
+
+		groups, err := s.GetErrorGroups(hours)
+		if err != nil {
+			http.Error(w, "Failed to fetch error groups", http.StatusInternalServerError)
+			return
+		}
+
+		httpx.WriteJSON(w, http.StatusOK, groups)
 	}
 }

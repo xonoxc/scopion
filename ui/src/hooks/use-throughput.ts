@@ -25,7 +25,8 @@ export function useThroughput(hours: number = 24) {
                throw new Error("Failed to fetch throughput")
             }
             return response.json()
-         } catch {
+         } catch (e) {
+            console.warn("useThroughput: API fetch failed, using mock data:", e)
             return mockThroughput
          }
       },

@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, Outlet, useLocation } from "@tanstack/react-router"
 import { TracesView } from "~/components/traces-view"
 
 export const Route = createFileRoute("/traces")({
@@ -6,6 +6,10 @@ export const Route = createFileRoute("/traces")({
 })
 
 function Traces() {
-   return <TracesView serviceFilter={null} />
+   const { pathname } = useLocation()
+   if (pathname === "/traces") {
+      return <TracesView serviceFilter={null} />
+   }
+   return <Outlet />
 }
 

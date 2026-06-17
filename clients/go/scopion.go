@@ -1,20 +1,24 @@
 package client
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
-	"strings"
+	"sync"
+	"time"
 )
 
 type Client struct {
-	BaseURL string
-}
-
-func NewClient(baseURL string) *Client {
-	return &Client{BaseURL: baseURL}
+	BaseURL    string
+	HTTPClient *http.Client
+	queue      chan map[string]any
+	flushEvery time.Duration
+	maxBatch   int
+	wg         sync.WaitGroup
+	once       sync.Once
+	stop       chan struct{}
 }
 
 type Event struct {
@@ -25,6 +29,20 @@ type Event struct {
 	Name      string         `json:"name"`
 	TraceID   *string        `json:"trace_id,omitempty"`
 	Data      map[string]any `json:"data,omitempty"`
+}
+
+func NewClient(baseURL string) *Client {
+	c := &Client{
+		BaseURL:    baseURL,
+		HTTPClient: &http.Client{Timeout: 5 * time.Second},
+		queue:      make(chan map[string]any, 4096),
+		flushEvery: 500 * time.Millisecond,
+		maxBatch:   100,
+		stop:       make(chan struct{}),
+	}
+	c.wg.Add(1)
+	go c.bgWorker()
+	return c
 }
 
 func (c *Client) IngestEvent(level, service, name string, traceID *string, customData map[string]any) error {
@@ -42,21 +60,83 @@ func (c *Client) IngestEvent(level, service, name string, traceID *string, custo
 		data["data"] = customData
 	}
 
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-
-	resp, err := http.Post(c.BaseURL+"/ingest", "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 202 {
-		return fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	select {
+	case c.queue <- data:
+	default:
+		return fmt.Errorf("client queue full, dropping event")
 	}
 	return nil
+}
+
+func (c *Client) bgWorker() {
+	defer c.wg.Done()
+	batch := make([]map[string]any, 0, c.maxBatch)
+	ticker := time.NewTicker(c.flushEvery)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-c.stop:
+			c.flush(batch)
+			return
+		case evt := <-c.queue:
+			batch = append(batch, evt)
+			if len(batch) >= c.maxBatch {
+				c.flush(batch)
+				batch = batch[:0]
+			}
+		case <-ticker.C:
+			if len(batch) > 0 {
+				c.flush(batch)
+				batch = batch[:0]
+			}
+		}
+	}
+}
+
+func (c *Client) flush(batch []map[string]any) {
+	if len(batch) == 0 {
+		return
+	}
+
+	for _, evt := range batch {
+		c.sendWithRetry(evt, 3)
+	}
+}
+
+func (c *Client) sendWithRetry(data map[string]any, maxRetries int) {
+	var lastErr error
+	for range maxRetries {
+		jsonData, err := json.Marshal(data)
+		if err != nil {
+			lastErr = err
+			break
+		}
+
+		resp, err := c.HTTPClient.Post(c.BaseURL+"/ingest", "application/json", bytes.NewBuffer(jsonData))
+		if err != nil {
+			lastErr = err
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		resp.Body.Close()
+
+		if resp.StatusCode == 202 {
+			return
+		}
+
+		lastErr = fmt.Errorf("unexpected status: %d", resp.StatusCode)
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	if lastErr != nil {
+		log.Printf("failed to send event after retries: %v", lastErr)
+	}
+}
+
+func (c *Client) Flush() {
+	close(c.stop)
+	c.wg.Wait()
 }
 
 func (c *Client) GetEvents(limit int) ([]Event, error) {
@@ -74,30 +154,4 @@ func (c *Client) GetEvents(limit int) ([]Event, error) {
 	var events []Event
 	err = json.NewDecoder(resp.Body).Decode(&events)
 	return events, err
-}
-
-func (c *Client) SubscribeLive() (<-chan Event, error) {
-	ch := make(chan Event)
-	go func() {
-		defer close(ch)
-		resp, err := http.Get(c.BaseURL + "/api/live")
-		if err != nil {
-			return
-		}
-
-		defer resp.Body.Close()
-		scanner := bufio.NewScanner(resp.Body)
-
-		for scanner.Scan() {
-			line := scanner.Text()
-			if after, ok := strings.CutPrefix(line, "data: "); ok {
-				data := after
-				var event Event
-				if err := json.Unmarshal([]byte(data), &event); err == nil {
-					ch <- event
-				}
-			}
-		}
-	}()
-	return ch, nil
 }

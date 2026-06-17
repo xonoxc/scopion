@@ -30,7 +30,8 @@ export function useErrorsByService(hours: number = 24) {
                throw new Error("Failed to fetch errors by service")
             }
             return response.json()
-         } catch {
+         } catch (e) {
+            console.warn("useErrorsByService: API fetch failed, using mock data:", e)
             return mockErrorsByService
          }
       },

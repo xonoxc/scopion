@@ -272,14 +272,14 @@ function getStatsData(stats?: Stats) {
               icon: Server,
               color: "text-success",
            },
-           {
-              label: "Avg Latency",
-              value: "55ms", // TODO: add latency to stats API
-              change: "-8ms",
-              trend: "down" as const,
-              icon: Clock,
-              color: "text-warning",
-           },
+         {
+            label: "Avg Latency",
+            value: `${stats.p50_latency.toFixed(0)}ms`,
+            change: "-8ms",
+            trend: "down" as const,
+            icon: Clock,
+            color: "text-warning",
+         },
         ]
       : []
 }

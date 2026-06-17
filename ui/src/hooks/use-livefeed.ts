@@ -25,7 +25,8 @@ export function useLiveFeed({ serviceFilter }: Omit<LiveFeedProps, "onSelectTrac
       const eventSource = new EventSource("/api/live")
 
       eventSource.onmessage = event => {
-         const newEvent: Event = JSON.parse(event.data)
+         const parsed = JSON.parse(event.data)
+         const newEvent: Event = parsed.Data ?? parsed
          setLiveEvents(prev => [newEvent, ...prev].slice(0, 50))
       }
 

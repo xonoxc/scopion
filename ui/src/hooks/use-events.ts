@@ -25,7 +25,7 @@ interface TraceEvent {
    data?: Record<string, unknown>
 }
 
-export function useTraceEvents(traceId: number) {
+export function useTraceEvents(traceId: string) {
    return useQuery({
       queryKey: ["trace-events", traceId],
       queryFn: async (): Promise<TraceEvent[]> => {
