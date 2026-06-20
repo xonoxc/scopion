@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/xonoxc/scopion/internal/app"
 	"github.com/xonoxc/scopion/internal/benchmark"
+	"github.com/xonoxc/scopion/internal/logger"
 )
 
 const scorpionArt = `
@@ -62,6 +63,8 @@ Scopion is a single-binary observability tool that collects telemetry data and p
 var (
 	port          string
 	enableDemo    bool
+	logFormat     string
+	logLevel      string
 	benchWorkers  int
 	benchDuration time.Duration
 	benchRate     int
@@ -73,6 +76,12 @@ var startCmd = &cobra.Command{
 	Short: "Start the Scopion server",
 	Long:  `Start the Scopion server with telemetry collection and web UI.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		log := logger.New(logger.Config{
+			Level:  logLevel,
+			Format: logFormat,
+		})
+		logger.SetDefault(log)
+
 		fmt.Print(scorpionArt)
 		fmt.Println()
 		ctx := context.Background()
@@ -82,6 +91,7 @@ var startCmd = &cobra.Command{
 		}
 		return app.StartServerWithConfig(ctx, port, app.ServerConfig{
 			Mode: mode,
+			Log:  log,
 		})
 	},
 }
@@ -285,6 +295,8 @@ func saveBenchmarkResult(result *benchmark.BenchmarkResult, filename string) err
 func init() {
 	startCmd.Flags().StringVarP(&port, "port", "p", "8080", "Port to run the server on")
 	startCmd.Flags().BoolVar(&enableDemo, "demo", true, "Enable demo data generation")
+	startCmd.Flags().StringVar(&logFormat, "log-format", "auto", "Log format: auto, text, json")
+	startCmd.Flags().StringVar(&logLevel, "log-level", "info", "Log level: debug, info, warn, error")
 
 	benchStandardCmd.Flags().IntVarP(&benchWorkers, "workers", "w", 10, "Number of concurrent workers")
 	benchStandardCmd.Flags().DurationVarP(&benchDuration, "duration", "d", 30*time.Second, "Benchmark duration")

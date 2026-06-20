@@ -1,6 +1,7 @@
 package app
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/xonoxc/scopion/internal/api"
@@ -16,14 +17,16 @@ type AppRouter struct {
 	broadcaster *live.Broadcaster
 	pipeline    *pipeline.Batcher
 	config      ServerConfig
+	log         *slog.Logger
 }
 
-func NewAppRouter(s store.Storage, broadcaster *live.Broadcaster, bp *pipeline.Batcher, config ServerConfig) *AppRouter {
+func NewAppRouter(s store.Storage, broadcaster *live.Broadcaster, bp *pipeline.Batcher, config ServerConfig, log *slog.Logger) *AppRouter {
 	return &AppRouter{
 		store:       s,
 		broadcaster: broadcaster,
 		pipeline:    bp,
 		config:      config,
+		log:         log,
 	}
 }
 
@@ -56,7 +59,7 @@ func (a *AppRouter) Setup() *http.ServeMux {
 	routes := a.getRoutes()
 
 	for _, r := range routes {
-		mux.Handle(r.Path, middleware.LoggingMiddleware(r.Handler))
+		mux.Handle(r.Path, middleware.LoggingMiddleware(a.log, r.Handler))
 	}
 
 	return mux

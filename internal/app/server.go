@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,6 +16,7 @@ import (
 	"github.com/xonoxc/scopion/internal/api/middleware"
 	"github.com/xonoxc/scopion/internal/demo"
 	"github.com/xonoxc/scopion/internal/live"
+	"github.com/xonoxc/scopion/internal/logger"
 	"github.com/xonoxc/scopion/internal/pipeline"
 	"github.com/xonoxc/scopion/internal/store/sqlite"
 	"github.com/xonoxc/scopion/ui"
@@ -32,6 +33,7 @@ type ServerConfig struct {
 	Mode            ServerMode
 	RetentionDays   int
 	CleanupInterval time.Duration
+	Log             *slog.Logger
 }
 
 func DefaultServerConfig() ServerConfig {
@@ -39,6 +41,7 @@ func DefaultServerConfig() ServerConfig {
 		Mode:            NORMAL_MODE,
 		RetentionDays:   7,
 		CleanupInterval: 1 * time.Hour,
+		Log:             logger.L(),
 	}
 }
 
@@ -49,10 +52,12 @@ func (s *ServerConfig) IsDemoMode() bool {
 func StartServer(ctx context.Context, port string, mode ServerMode) error {
 	return StartServerWithConfig(ctx, port, ServerConfig{
 		Mode: mode,
+		Log:  logger.L(),
 	})
 }
 
 func StartServerWithConfig(ctx context.Context, port string, config ServerConfig) error {
+	log := config.Log.With("svc", "scopion")
 	db, err := sql.Open("sqlite3", "./scopion.db")
 	if err != nil {
 		return err
@@ -70,7 +75,7 @@ func StartServerWithConfig(ctx context.Context, port string, config ServerConfig
 	}
 
 	broadcaster := live.New()
-	bp := pipeline.New(store, broadcaster)
+	bp := pipeline.New(store, broadcaster, log)
 
 	pipelineCtx, pipelineCancel := context.WithCancel(context.Background())
 	defer pipelineCancel()
@@ -92,9 +97,9 @@ func StartServerWithConfig(ctx context.Context, port string, config ServerConfig
 				case <-ticker.C:
 					deleted, err := store.DeleteEventsOlderThan(time.Duration(config.RetentionDays) * 24 * time.Hour)
 					if err != nil {
-						log.Printf("retention cleanup failed: %v", err)
+						log.Warn("retention cleanup failed", "error", err)
 					} else if deleted > 0 {
-						log.Printf("retention cleanup: deleted %d events older than %d days", deleted, config.RetentionDays)
+						log.Info("retention cleanup completed", "deleted", deleted, "retention_days", config.RetentionDays)
 					}
 				}
 			}
@@ -102,13 +107,13 @@ func StartServerWithConfig(ctx context.Context, port string, config ServerConfig
 	}
 
 	if config.Mode == DEMO_MODE {
-		log.Println("Demo mode enabled - generating sample telemetry data")
+		log.Info("demo mode enabled - generating sample telemetry data")
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
-		demo.Start(ctx, store, broadcaster)
+		demo.Start(ctx, store, broadcaster, log)
 	}
 
-	router := NewAppRouter(store, broadcaster, bp, config)
+	router := NewAppRouter(store, broadcaster, bp, config, log)
 	mux := router.Setup()
 
 	sub, err := fs.Sub(ui.FS, "dist")
@@ -117,7 +122,7 @@ func StartServerWithConfig(ctx context.Context, port string, config ServerConfig
 	}
 
 	mux.Handle(
-		"/", middleware.LoggingMiddleware(http.FileServer(http.FS(sub))),
+		"/", middleware.LoggingMiddleware(log, http.FileServer(http.FS(sub))),
 	)
 
 	server := &http.Server{Addr: ":" + port, Handler: mux}
@@ -126,17 +131,18 @@ func StartServerWithConfig(ctx context.Context, port string, config ServerConfig
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		log.Printf("Server starting on :%s", port)
+		log.Info("server starting", "port", port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server failed to start: %v", err)
+			log.Error("server failed to start", "error", err)
+			os.Exit(1)
 		}
 	}()
 
 	select {
 	case sig := <-shutdown:
-		log.Printf("Received signal %v, shutting down gracefully...", sig)
+		log.Info("shutting down gracefully", "signal", sig)
 	case <-ctx.Done():
-		log.Println("Context cancelled, shutting down gracefully...")
+		log.Info("context cancelled, shutting down gracefully")
 	}
 
 	shutdownCtx, cancel := context.WithTimeout(
@@ -147,14 +153,14 @@ func StartServerWithConfig(ctx context.Context, port string, config ServerConfig
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		if err == context.DeadlineExceeded {
-			log.Println("Shutdown timeout exceeded, server may still be shutting down...")
+			log.Warn("shutdown timeout exceeded, server may still be shutting down")
 			return nil
 		} else {
-			log.Printf("Server shutdown error: %v", err)
+			log.Error("server shutdown error", "error", err)
 			return err
 		}
 	}
 
-	log.Println("Server stopped gracefully")
+	log.Info("server stopped gracefully")
 	return nil
 }

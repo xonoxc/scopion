@@ -3,6 +3,7 @@ package demo
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"strings"
 	"time"
@@ -110,16 +111,16 @@ func generateCustomData(service, name string) map[string]any {
 	return data
 }
 
-func Start(ctx context.Context, s store.Storage, live *live.Broadcaster) {
-	generateHistoricalData(s)
+func Start(ctx context.Context, s store.Storage, b *live.Broadcaster, log *slog.Logger) {
+	generateHistoricalData(s, log)
 
-	go generateLoop(ctx, "api", s, live, 50, 250, 0.1)
-	go generateLoop(ctx, "worker", s, live, 100, 500, 0.2)
-	go generateLoop(ctx, "webhook", s, live, 200, 800, 0.15)
-	go generateLoop(ctx, "cron", s, live, 500, 1000, 0.05)
-	go generateLoop(ctx, "scheduler", s, live, 200, 600, 0.08)
-	go generateLoop(ctx, "auth", s, live, 100, 350, 0.12)
-	go generateLoop(ctx, "payment", s, live, 150, 400, 0.25)
+	go generateLoop(ctx, "api", s, b, log, 50, 250, 0.1)
+	go generateLoop(ctx, "worker", s, b, log, 100, 500, 0.2)
+	go generateLoop(ctx, "webhook", s, b, log, 200, 800, 0.15)
+	go generateLoop(ctx, "cron", s, b, log, 500, 1000, 0.05)
+	go generateLoop(ctx, "scheduler", s, b, log, 200, 600, 0.08)
+	go generateLoop(ctx, "auth", s, b, log, 100, 350, 0.12)
+	go generateLoop(ctx, "payment", s, b, log, 150, 400, 0.25)
 }
 
 var serviceEndpoints = map[string][]string{
@@ -132,7 +133,7 @@ var serviceEndpoints = map[string][]string{
 	"payment":   {"ChargeCard", "RefundPayment", "ValidatePayment", "ProcessRefund"},
 }
 
-func generateLoop(ctx context.Context, service string, s store.Storage, live *live.Broadcaster, minDelay, maxDelay int, errorRate float64) {
+func generateLoop(ctx context.Context, service string, s store.Storage, b *live.Broadcaster, log *slog.Logger, minDelay, maxDelay int, errorRate float64) {
 	endpoints := serviceEndpoints[service]
 	for {
 		select {
@@ -144,10 +145,10 @@ func generateLoop(ctx context.Context, service string, s store.Storage, live *li
 		traceID := randomID()
 		endpoint := endpoints[rand.Intn(len(endpoints))]
 
-		emit(s, live, service, endpoint, traceID, "info")
+		emitWithTime(s, b, log, service, endpoint, traceID, "info", time.Now())
 
 		if rand.Float64() < errorRate {
-			emit(s, live, service, "db operation", traceID, "error")
+			emitWithTime(s, b, log, service, "db operation", traceID, "error", time.Now())
 		}
 
 		delay := time.Duration(minDelay+rand.Intn(maxDelay-minDelay)) * time.Millisecond
@@ -155,7 +156,7 @@ func generateLoop(ctx context.Context, service string, s store.Storage, live *li
 	}
 }
 
-func generateHistoricalData(s store.Storage) {
+func generateHistoricalData(s store.Storage, log *slog.Logger) {
 	now := time.Now()
 	for range 200 {
 		pastTime := now.Add(-time.Duration(rand.Intn(86400)) * time.Second)
@@ -169,20 +170,16 @@ func generateHistoricalData(s store.Storage) {
 			level = "error"
 		}
 
-		emitWithTime(s, nil, service, endpoint, traceID, level, pastTime)
+		emitWithTime(s, nil, log, service, endpoint, traceID, level, pastTime)
 
 		if rand.Float64() < 0.6 {
 			pastTime2 := pastTime.Add(time.Duration(rand.Intn(500)) * time.Millisecond)
-			emitWithTime(s, nil, service, "db operation", traceID, level, pastTime2)
+			emitWithTime(s, nil, log, service, "db operation", traceID, level, pastTime2)
 		}
 	}
 }
 
-func emit(s store.Storage, live *live.Broadcaster, service, name, traceID, level string) {
-	emitWithTime(s, live, service, name, traceID, level, time.Now())
-}
-
-func emitWithTime(s store.Storage, live *live.Broadcaster, service, name, traceID, level string, timestamp time.Time) {
+func emitWithTime(s store.Storage, b *live.Broadcaster, log *slog.Logger, service, name, traceID, level string, timestamp time.Time) {
 	e := model.Event{
 		ID:          uuid.New().String(),
 		Timestamp:   timestamp,
@@ -220,7 +217,7 @@ func emitWithTime(s store.Storage, live *live.Broadcaster, service, name, traceI
 			break
 		}
 		if retries == 2 {
-			println("Failed to append event after retries:", err.Error())
+			log.Error("failed to append event after retries", "error", err, "service", service, "name", name)
 		}
 		time.Sleep(time.Duration(retries+1) * 10 * time.Millisecond)
 	}
@@ -231,13 +228,13 @@ func emitWithTime(s store.Storage, live *live.Broadcaster, service, name, traceI
 			break
 		}
 		if retries == 2 {
-			println("Failed to append span after retries:", err.Error())
+			log.Error("failed to append span after retries", "error", err, "service", service, "name", name)
 		}
 		time.Sleep(time.Duration(retries+1) * 10 * time.Millisecond)
 	}
 
-	if live != nil {
-		live.Publish(e)
+	if b != nil {
+		b.Publish(e)
 	}
 }
 

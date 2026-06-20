@@ -2,7 +2,7 @@ package pipeline
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/xonoxc/scopion/internal/live"
@@ -21,14 +21,16 @@ type Batcher struct {
 	spans       chan model.Span
 	store       store.Storage
 	broadcaster *live.Broadcaster
+	log         *slog.Logger
 }
 
-func New(s store.Storage, b *live.Broadcaster) *Batcher {
+func New(s store.Storage, b *live.Broadcaster, log *slog.Logger) *Batcher {
 	return &Batcher{
 		events:      make(chan model.Event, channelBufSize),
 		spans:       make(chan model.Span, channelBufSize),
 		store:       s,
 		broadcaster: b,
+		log:         log,
 	}
 }
 
@@ -36,7 +38,7 @@ func (bp *Batcher) SubmitEvent(e model.Event) {
 	select {
 	case bp.events <- e:
 	default:
-		log.Println("warning: event channel full, dropping event")
+		bp.log.Warn("event channel full, dropping event")
 	}
 }
 
@@ -44,7 +46,7 @@ func (bp *Batcher) SubmitSpan(s model.Span) {
 	select {
 	case bp.spans <- s:
 	default:
-		log.Println("warning: span channel full, dropping span")
+		bp.log.Warn("span channel full, dropping span")
 	}
 }
 
@@ -90,7 +92,7 @@ func (bp *Batcher) Run(ctx context.Context) {
 func (bp *Batcher) flushEvents(batch []model.Event) {
 	for _, e := range batch {
 		if err := bp.store.Append(e); err != nil {
-			log.Printf("failed to append event: %v", err)
+			bp.log.Error("failed to append event", "error", err)
 			continue
 		}
 		if bp.broadcaster != nil {
@@ -102,7 +104,7 @@ func (bp *Batcher) flushEvents(batch []model.Event) {
 func (bp *Batcher) flushSpans(batch []model.Span) {
 	for _, s := range batch {
 		if err := bp.store.AppendSpan(s); err != nil {
-			log.Printf("failed to append span: %v", err)
+			bp.log.Error("failed to append span", "error", err)
 			continue
 		}
 		if bp.broadcaster != nil {
